@@ -31,3 +31,10 @@ if [ -f "$DTS_FILE" ]; then
     sed -i '98s/^};/\t};/' "$DTS_FILE"
     echo "Fixed rk3399-fine-3399.dts syntax error"
 fi
+# Fix duplicate label 'usb_pwr' in rk3399-fine-3399.dts
+DTS_FILE="target/linux/rockchip/files/arch/arm64/boot/dts/rockchip/rk3399-fine-3399.dts"
+if [ -f "$DTS_FILE" ]; then
+    # Fix pinctrl label: usb_pwr -> pinctrl_usb_pwr (line 448)
+    sed -i '448s/usb_pwr: usb-pwr-grp/pinctrl_usb_pwr: usb-pwr-grp/' "$DTS_FILE"
+    echo "Fixed duplicate label usb_pwr in rk3399-fine-3399.dts"
+fi
