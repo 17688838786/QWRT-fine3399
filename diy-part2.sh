@@ -18,3 +18,16 @@
 
 # Modify hostname
 #sed -i 's/OpenWrt/P3TERX-Router/g' package/base-files/files/bin/config_generate
+
+# Fix rk3399-fine-3399.dts syntax error (Unicode hyphen and indentation)
+DTS_FILE="target/linux/rockchip/files/arch/arm64/boot/dts/rockchip/rk3399-fine-3399.dts"
+if [ -f "$DTS_FILE" ]; then
+    # Replace Unicode non-breaking hyphen (U+2011) with ASCII hyphen
+    sed -i 's/\xc2\xad/-/g' "$DTS_FILE" 2>/dev/null || true
+    sed -i 's/\xe2\x80\x91/-/g' "$DTS_FILE" 2>/dev/null || true
+    # Fix indentation for usb_pwr node (lines 92-98)
+    sed -i '92s/^    /\t/' "$DTS_FILE"
+    sed -i '93,97s/^    /\t\t/' "$DTS_FILE"
+    sed -i '98s/^};/\t};/' "$DTS_FILE"
+    echo "Fixed rk3399-fine-3399.dts syntax error"
+fi
