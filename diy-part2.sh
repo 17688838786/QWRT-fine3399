@@ -38,6 +38,7 @@ if [ -f "$DTS_FILE" ]; then
     sed -i '448s/usb_pwr: usb-pwr-grp/pinctrl_usb_pwr: usb-pwr-grp/' "$DTS_FILE"
     echo "Fixed duplicate label usb_pwr in rk3399-fine-3399.dts"
 fi
+
 # === 添加高通 QCNFA765 (WCN6855) ath11k WiFi 驱动支持 ===
 echo "Adding ath11k driver support to kernel config..."
 KERNEL_CONFIG="target/linux/rockchip/armv8/config-6.12"
@@ -58,7 +59,7 @@ if [ -f "$KERNEL_CONFIG" ]; then
     sed -i '/^CONFIG_ATH6KL=/d' "$KERNEL_CONFIG"
     sed -i '/^CONFIG_ATH5K=/d' "$KERNEL_CONFIG"
     sed -i '/^CONFIG_WCN36XX=/d' "$KERNEL_CONFIG"
-    
+
     # 添加 ath11k 及依赖配置
     cat >> "$KERNEL_CONFIG" << 'KERNEL_EOF'
 CONFIG_ATH_COMMON=m
@@ -92,7 +93,6 @@ KERNEL_EOF
     echo "ath11k kernel config added to $KERNEL_CONFIG"
 else
     echo "WARNING: Kernel config file $KERNEL_CONFIG not found"
-    # 尝试查找其他可能的配置文件
     find target/linux/rockchip -name "config-*" -type f 2>/dev/null
 fi
 # === ath11k 驱动配置结束 ===
