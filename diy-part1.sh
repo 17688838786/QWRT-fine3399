@@ -1,4 +1,4 @@
-#!/bin/bash
+﻿#!/bin/bash
 #
 # https://github.com/P3TERX/Actions-OpenWrt
 # File name: diy-part1.sh
@@ -16,3 +16,15 @@
 # Add a feed source
 echo 'src-git helloworld https://github.com/fw876/helloworld' >>feeds.conf.default
 #echo 'src-git passwall https://github.com/xiaorouji/openwrt-passwall' >>feeds.conf.default
+
+# QModem - 5G模组管理（含短信、多WAN、TTL功能）
+echo 'src-git qmodem https://github.com/FUjr/QModem.git;main' >>feeds.conf.default
+
+# OpenClash - 网络工具
+echo 'src-git openclash https://github.com/vernesong/OpenClash.git;master' >>feeds.conf.default
+
+# LuCI主题 - argon-mod (基于原版argon优化)
+git clone --depth=1 https://github.com/jerrykuku/luci-theme-argon.git package/lean/luci-theme-argon-mod 2>/dev/null || true
+
+# LuCI主题 - neobird (专为移动端优化)
+git clone --depth=1 https://github.com/thinktip/luci-theme-neobird.git package/lean/luci-theme-neobird 2>/dev/null || true
