@@ -1,4 +1,4 @@
-﻿﻿#
+﻿﻿﻿#
 # https://github.com/P3TERX/Actions-OpenWrt
 #
 # File: .github/workflows/openwrt-bulder.yml
@@ -144,6 +144,29 @@ jobs:
         name: OpenWrt_kernel_rootfs${{ env.DEVICE_NAME }}${{ env.FILE_DATE }}
         path: openwrt/kernel-rootfs/
 
+    - name: Collect packages
+      id: collect_packages
+      if: steps.compile.outputs.status == 'success' && !cancelled()
+      run: |
+        cd openwrt
+        mkdir -p packages-ipk
+        # 收集所有ipk软件包
+        find bin/packages -name "*.ipk" -exec cp {} packages-ipk/ \; 2>/dev/null || true
+        # 也收集targets目录下的packages
+        find bin/targets -name "*.ipk" -exec cp {} packages-ipk/ \; 2>/dev/null || true
+        # 统计软件包数量
+        PACKAGE_COUNT=$(ls -1 packages-ipk/*.ipk 2>/dev/null | wc -l)
+        echo "收集到 $PACKAGE_COUNT 个ipk软件包"
+        ls -lh packages-ipk/ | head -20
+        echo "status=success" >> $GITHUB_OUTPUT
+
+    - name: Upload packages
+      uses: actions/upload-artifact@main
+      if: steps.collect_packages.outputs.status == 'success' && !cancelled()
+      with:
+        name: OpenWrt_packages${{ env.DEVICE_NAME }}${{ env.FILE_DATE }}
+        path: openwrt/packages-ipk/
+
     - name: Check space usage
       if: (!cancelled())
       run: df -hT
@@ -204,4 +227,5 @@ jobs:
         delete_tags: true
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
 
