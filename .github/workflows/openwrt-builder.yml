@@ -1,4 +1,4 @@
-﻿#
+﻿﻿#
 # https://github.com/P3TERX/Actions-OpenWrt
 #
 # File: .github/workflows/openwrt-bulder.yml
@@ -100,6 +100,50 @@ jobs:
         [ -s DEVICE_NAME ] && echo "DEVICE_NAME=_$(cat DEVICE_NAME)" >> $GITHUB_ENV
         echo "FILE_DATE=_$(date +"%Y%m%d%H%M")" >> $GITHUB_ENV
 
+    - name: Collect kernel and rootfs
+      id: collect_kernel_rootfs
+      if: steps.compile.outputs.status == 'success' && !cancelled()
+      run: |
+        cd openwrt
+        mkdir -p kernel-rootfs
+        # 收集内核文件
+        KERNEL_FILE=$(find build_dir/target-*/linux-*/arch/arm64/boot -name "Image" -o -name "zImage" 2>/dev/null | head -1)
+        if [ -n "$KERNEL_FILE" ]; then
+          cp "$KERNEL_FILE" kernel-rootfs/kernel.img
+          echo "内核文件: $KERNEL_FILE"
+        else
+          echo "未找到内核文件"
+        fi
+        # 收集设备树文件
+        DTB_FILE=$(find build_dir/target-*/linux-*/arch/arm64/boot/dts -name "*fine3399*.dtb" 2>/dev/null | head -1)
+        if [ -n "$DTB_FILE" ]; then
+          cp "$DTB_FILE" kernel-rootfs/rk3399-fine3399.dtb
+          echo "设备树文件: $DTB_FILE"
+        fi
+        # 收集rootfs.tar.gz
+        ROOTFS_FILE=$(find bin/targets -name "*rootfs.tar.gz" 2>/dev/null | head -1)
+        if [ -n "$ROOTFS_FILE" ]; then
+          cp "$ROOTFS_FILE" kernel-rootfs/rootfs.tar.gz
+          echo "RootFS文件: $ROOTFS_FILE"
+        else
+          echo "未找到rootfs.tar.gz"
+        fi
+        # 收集squashfs rootfs
+        SQUASHFS_FILE=$(find bin/targets -name "*rootfs.squashfs" 2>/dev/null | head -1)
+        if [ -n "$SQUASHFS_FILE" ]; then
+          cp "$SQUASHFS_FILE" kernel-rootfs/rootfs.squashfs
+          echo "SquashFS文件: $SQUASHFS_FILE"
+        fi
+        ls -lh kernel-rootfs/
+        echo "status=success" >> $GITHUB_OUTPUT
+
+    - name: Upload kernel and rootfs
+      uses: actions/upload-artifact@main
+      if: steps.collect_kernel_rootfs.outputs.status == 'success' && !cancelled()
+      with:
+        name: OpenWrt_kernel_rootfs${{ env.DEVICE_NAME }}${{ env.FILE_DATE }}
+        path: openwrt/kernel-rootfs/
+
     - name: Check space usage
       if: (!cancelled())
       run: df -hT
@@ -160,3 +204,4 @@ jobs:
         delete_tags: true
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
