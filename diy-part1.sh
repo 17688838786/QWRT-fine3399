@@ -17,6 +17,10 @@
 echo 'src-git helloworld https://github.com/fw876/helloworld' >>feeds.conf.default
 #echo 'src-git passwall https://github.com/xiaorouji/openwrt-passwall' >>feeds.conf.default
 
+# 移除已存在的qmodem feed（避免重复）
+sed -i '/src-git qmodem/d' feeds.conf.default
+sed -i '/src-git openclash/d' feeds.conf.default
+
 # QModem - 5G模组管理（含短信、多WAN、TTL功能）
 echo 'src-git qmodem https://github.com/FUjr/QModem.git;main' >>feeds.conf.default
 
@@ -24,7 +28,9 @@ echo 'src-git qmodem https://github.com/FUjr/QModem.git;main' >>feeds.conf.defau
 echo 'src-git openclash https://github.com/vernesong/OpenClash.git;master' >>feeds.conf.default
 
 # LuCI主题 - argon-mod (基于原版argon优化)
+rm -rf package/lean/luci-theme-argon-mod
 git clone --depth=1 https://github.com/jerrykuku/luci-theme-argon.git package/lean/luci-theme-argon-mod 2>/dev/null || true
 
 # LuCI主题 - neobird (专为移动端优化)
+rm -rf package/lean/luci-theme-neobird
 git clone --depth=1 https://github.com/thinktip/luci-theme-neobird.git package/lean/luci-theme-neobird 2>/dev/null || true
