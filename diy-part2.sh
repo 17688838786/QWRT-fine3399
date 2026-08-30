@@ -96,3 +96,37 @@ else
     find target/linux/rockchip -name "config-*" -type f 2>/dev/null
 fi
 # === ath11k 驱动配置结束 ===
+
+# === 添加 PWM 风扇驱动支持 (pwm-fan) ===
+echo "Adding PWM fan driver support to kernel config..."
+if [ -f "$KERNEL_CONFIG" ]; then
+    sed -i '/^CONFIG_SENSORS_PWM_FAN=/d' "$KERNEL_CONFIG"
+    sed -i '/^CONFIG_PWM=/d' "$KERNEL_CONFIG"
+    sed -i '/^CONFIG_PWM_ROCKCHIP=/d' "$KERNEL_CONFIG"
+    sed -i '/^CONFIG_PWM_SYSFS=/d' "$KERNEL_CONFIG"
+    sed -i '/^CONFIG_THERMAL=/d' "$KERNEL_CONFIG"
+    sed -i '/^CONFIG_THERMAL_HWMON=/d' "$KERNEL_CONFIG"
+    sed -i '/^CONFIG_CPU_THERMAL=/d' "$KERNEL_CONFIG"
+    sed -i '/^CONFIG_THERMAL_DEFAULT_GOV_STEP_WISE=/d' "$KERNEL_CONFIG"
+    sed -i '/^CONFIG_THERMAL_GOV_STEP_WISE=/d' "$KERNEL_CONFIG"
+    sed -i '/^CONFIG_THERMAL_GOV_USER_SPACE=/d' "$KERNEL_CONFIG"
+    sed -i '/^CONFIG_HWMON=/d' "$KERNEL_CONFIG"
+    sed -i '/^CONFIG_SENSORS_CORETEMP=/d' "$KERNEL_CONFIG"
+
+    cat >> "$KERNEL_CONFIG" << 'PWM_EOF'
+CONFIG_PWM=y
+CONFIG_PWM_ROCKCHIP=y
+CONFIG_PWM_SYSFS=y
+CONFIG_SENSORS_PWM_FAN=y
+CONFIG_HWMON=y
+CONFIG_THERMAL=y
+CONFIG_THERMAL_HWMON=y
+CONFIG_CPU_THERMAL=y
+CONFIG_THERMAL_DEFAULT_GOV_STEP_WISE=y
+CONFIG_THERMAL_GOV_STEP_WISE=y
+CONFIG_THERMAL_GOV_USER_SPACE=y
+CONFIG_SENSORS_CORETEMP=y
+PWM_EOF
+    echo "PWM fan kernel config added"
+fi
+# === PWM 风扇驱动配置结束 ===
