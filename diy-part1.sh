@@ -17,20 +17,20 @@
 echo 'src-git helloworld https://github.com/fw876/helloworld' >>feeds.conf.default
 #echo 'src-git passwall https://github.com/xiaorouji/openwrt-passwall' >>feeds.conf.default
 
-# 绉婚櫎宸插瓨鍦ㄧ殑qmodem feed锛堥伩鍏嶉噸澶嶏級
+# 缁夊娅庡鎻掔摠閸︺劎娈憅modem feed閿涘牓浼╅崗宥夊櫢婢跺稄绱?
 sed -i '/src-git qmodem/d' feeds.conf.default
 sed -i '/src-git openclash/d' feeds.conf.default
 
-# QModem - 5G妯＄粍绠＄悊锛堝惈鐭俊銆佸WAN銆乀TL鍔熻兘锛?
+# QModem - 5G濡紕绮嶇粻锛勬倞閿涘牆鎯堥惌顓濅繆閵嗕礁顦縒AN閵嗕箑TL閸旂喕鍏橀敍?
 echo 'src-git qmodem https://github.com/FUjr/QModem.git;main' >>feeds.conf.default
 
-# OpenClash - 缃戠粶宸ュ叿
+# OpenClash - 缂冩垹绮跺銉ュ徔
 echo 'src-git openclash https://github.com/vernesong/OpenClash.git;master' >>feeds.conf.default
 
-# LuCI涓婚 - argon-mod (鍩轰簬鍘熺増argon浼樺寲)
+# LuCI娑撳顣?- argon-mod (閸╄桨绨崢鐔哄argon娴兼ê瀵?
 rm -rf package/lean/luci-theme-argon-mod
 git clone --depth=1 https://github.com/jerrykuku/luci-theme-argon.git package/lean/luci-theme-argon-mod 2>/dev/null || true
 
-# LuCI涓婚 - neobird (涓撲负绉诲姩绔紭鍖?
+# LuCI娑撳顣?- neobird (娑撴挷璐熺粔璇插З缁旑垯绱崠?
 rm -rf package/lean/luci-theme-neobird
 git clone --depth=1 https://github.com/thinktip/luci-theme-neobird.git package/lean/luci-theme-neobird 2>/dev/null || true
