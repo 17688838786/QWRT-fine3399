@@ -1,0 +1,77 @@
+#!/bin/sh
+# WiFi 默认配置脚本
+# 在首次启动时自动执行，执行后自动删除
+# VHT160 / 频道36 / US地区 / SSID: FNet-5G / 密码: password / 绑定 LAN
+
+[ -e /etc/config/wireless ] || exit 0
+
+# 等待 wireless 配置完全生成
+sleep 3
+
+# 检测 5GHz radio（通常是 radio1，但也可能是其他）
+detect_5g_radio() {
+    for radio in radio0 radio1 radio2; do
+        local band
+        band=$(uci -q get wireless.${radio}.band 2>/dev/null)
+        if [ "$band" = "5g" ] || [ "$band" = "5GHz" ] || [ "$band" = "a" ]; then
+            echo "$radio"
+            return 0
+        fi
+        # 检查 htmode 是否包含 VHT/HE（5GHz 特征）
+        local htmode
+        htmode=$(uci -q get wireless.${radio}.htmode 2>/dev/null)
+        case "$htmode" in
+            VHT*|HE*|EHT*) echo "$radio"; return 0 ;;
+        esac
+    done
+    # 默认用 radio1
+    echo "radio1"
+}
+
+RADIO=$(detect_5g_radio)
+logger -t wifi-default "Detected 5GHz radio: $RADIO"
+
+# 设置 radio 设备参数
+uci set wireless.${RADIO}.channel='36'
+uci set wireless.${RADIO}.htmode='VHT160'
+uci set wireless.${RADIO}.country='US'
+uci set wireless.${RADIO}.disabled='0'
+
+# 找到对应的 wifi-iface
+IFACE=""
+for iface in default_radio0 default_radio1 default_radio2; do
+    local dev
+    dev=$(uci -q get wireless.${iface}.device 2>/dev/null)
+    if [ "$dev" = "$RADIO" ]; then
+        IFACE="$iface"
+        break
+    fi
+done
+
+# 如果没找到，搜索所有 wifi-iface
+if [ -z "$IFACE" ]; then
+    IFACE=$(uci show wireless 2>/dev/null | grep "wifi-iface" | grep "device='${RADIO}'" | head -1 | cut -d. -f2)
+fi
+
+# 如果还是没找到，创建一个
+if [ -z "$IFACE" ]; then
+    IFACE="default_${RADIO}"
+    uci set wireless.${IFACE}="wifi-iface"
+    uci set wireless.${IFACE}.device="${RADIO}"
+fi
+
+# 设置接口参数
+uci set wireless.${IFACE}.ssid='FNet-5G'
+uci set wireless.${IFACE}.encryption='psk2'
+uci set wireless.${IFACE}.key='password'
+uci set wireless.${IFACE}.network='lan'
+uci set wireless.${IFACE}.mode='ap'
+
+uci commit wireless
+
+logger -t wifi-default "WiFi configured: SSID=FNet-5G, channel=36, VHT160, country=US, bind=LAN"
+
+# 重启 WiFi
+wifi reload 2>/dev/null || wifi up 2>/dev/null
+
+exit 0
