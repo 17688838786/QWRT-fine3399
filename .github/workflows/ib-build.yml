@@ -32,13 +32,9 @@ jobs:
           IB_DIR=$(ls -d openwrt-imagebuilder-* | head -1)
           echo "IB_DIR: $IB_DIR"
           cd "$IB_DIR"
-          echo "=== Available profiles ==="
-          make info | head -50
-          echo "=== Building ==="
-          PKGS="luci luci-i18n-base-zh-cn luci-theme-argon curl wget nano htop ca-certificates ca-bundle openssl-util zoneinfo-asia ${{ github.event.inputs.packages }}"
-          make image PROFILE="rumu3f_fine-3399" PACKAGES="$PKGS" 2>&1 | tee build.log | tail -50
-          echo "=== Build result ==="
-          echo "Exit code: $?"
+          PKGS="luci luci-i18n-base-zh-cn luci-theme-argon curl wget htop ca-certificates ca-bundle openssl-util ${{ github.event.inputs.packages }}"
+          make image PROFILE="rumu3f_fine-3399" PACKAGES="$PKGS" IGNORE_ERRORS=1 2>&1 | tee build.log | tail -50
+          echo "=== Build exit code: $? ==="
           echo "=== Generated files ==="
           find bin/targets -type f
           mkdir -p ../output
