@@ -100,7 +100,10 @@ jobs:
           echo "=== Building ==="
           PKGS="luci luci-i18n-base-zh-cn luci-theme-argon curl wget htop ca-certificates ca-bundle openssl-util -luci-app-accesscontrol -luci-app-filetransfer ${{ github.event.inputs.packages }}"
           echo "Packages: $PKGS"
-          make image PROFILE="rumu3f_fine-3399" PACKAGES="$PKGS" FILES="$PWD/custom_files" V=s > build.log 2>&1
+          echo "Custom files dir: $CUSTOM_ROOT"
+          ls -laR "$CUSTOM_ROOT" 2>&1
+          echo ""
+          make image PROFILE="rumu3f_fine-3399" PACKAGES="$PKGS" FILES="custom_files" V=s > build.log 2>&1
           MAKE_EXIT=$?
           echo "=== Make exit code: $MAKE_EXIT ==="
           echo "=== Build log (last 200 lines) ==="
