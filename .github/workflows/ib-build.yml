@@ -32,9 +32,22 @@ jobs:
           IB_DIR=$(ls -d openwrt-imagebuilder-* | head -1)
           echo "IB_DIR: $IB_DIR"
           cd "$IB_DIR"
-          echo "=== Available profiles ==="
+          
+          echo "=== All profiles (searching for fine/3399/rumu) ==="
           make info > info.txt 2>&1
-          head -30 info.txt
+          grep -i -A 5 "fine\|3399\|rumu" info.txt
+          
+          echo "=== JSON files in target ==="
+          find . -name "*.json" -path "*rockchip*" 2>/dev/null | head -30
+          
+          echo "=== JSON files for fine3399 ==="
+          find . -name "*fine*" -o -name "*3399*" -o -name "*rumu*" 2>/dev/null | head -30
+          
+          echo "=== target/linux directory ==="
+          ls -la target/linux/ 2>/dev/null || echo "No target/linux directory"
+          ls -la target/linux/rockchip/ 2>/dev/null || echo "No rockchip directory"
+          ls -la target/linux/rockchip/armv8/ 2>/dev/null || echo "No armv8 directory"
+          
           echo "=== Building ==="
           PKGS="luci luci-i18n-base-zh-cn luci-theme-argon curl wget htop ca-certificates ca-bundle openssl-util -luci-app-accesscontrol -luci-app-filetransfer ${{ github.event.inputs.packages }}"
           echo "Packages: $PKGS"
@@ -50,10 +63,9 @@ jobs:
           find bin/targets -type f -name "*rootfs*.tar.gz" -exec cp {} ../output/ \; 2>&1
           find bin/targets -type f -name "*.manifest" -exec cp {} ../output/ \; 2>&1
           cp build.log ../output/ 2>&1
+          cp info.txt ../output/ 2>&1
           echo "=== Output files ==="
           ls -lh ../output/ 2>&1
-          echo "=== Disk space ==="
-          df -h
           if [ $MAKE_EXIT -ne 0 ]; then
             echo "=== Build failed ==="
             exit 1
