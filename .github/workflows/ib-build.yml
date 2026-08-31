@@ -20,72 +20,44 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y build-essential clang flex bison g++ gawk gettext git libncurses-dev libssl-dev rsync unzip zlib1g-dev file wget xz-utils
 
-      - name: Debug
+      - name: Debug targetinfo
         run: |
-          set -x
           TAG=$(curl -s "https://api.github.com/repos/17688838786/QWRT-fine3399/releases/latest" | grep -o '"tag_name": *"[^"]*"' | head -1 | sed 's/.*"tag_name": *"\([^"]*\)".*/\1/')
-          echo "Release: $TAG"
           IB_URL=$(curl -s "https://api.github.com/repos/17688838786/QWRT-fine3399/releases/tags/$TAG" | grep -o '"browser_download_url": *"[^"]*imagebuilder[^"]*"' | head -1 | sed 's/.*"browser_download_url": *"\([^"]*\)".*/\1/')
-          echo "IB: $IB_URL"
           wget -q -O ib.tar.xz "$IB_URL"
           tar -xf ib.tar.xz
           IB_DIR=$(ls -d openwrt-imagebuilder-* | head -1)
           cd "$IB_DIR"
 
-          echo "=== 1. Search all files containing rumu3f ==="
-          grep -rl "rumu3f" . 2>/dev/null | head -20
+          echo "=== .targetinfo full content for rumu3f ==="
+          grep -A 50 "rumu3f" .targetinfo || true
           echo ""
 
-          echo "=== 2. Search all files containing fine-3399 ==="
-          grep -rl "fine-3399\|fine3399" . 2>/dev/null | head -20
+          echo "=== .targetinfo first 30 lines (format) ==="
+          head -30 .targetinfo
           echo ""
 
-          echo "=== 3. rockchip image Makefile ==="
-          cat target/linux/rockchip/image/Makefile
+          echo "=== How ImageBuilder generates device defs ==="
+          grep -rn "targetinfo\|TargetInfo\|DEVICE_INFO\|json_add" include/ scripts/ 2>/dev/null | grep -v ".pyc" | head -20
           echo ""
 
-          echo "=== 4. Check if device def in image/Makefile ==="
-          grep -n "rumu3f\|fine-3399\|fine3399" target/linux/rockchip/image/Makefile 2>/dev/null
+          echo "=== Check bin/targets after make info ==="
+          make info > /dev/null 2>&1 || true
+          find bin/targets -type f 2>/dev/null | head -20
           echo ""
 
-          echo "=== 5. bin/targets directory structure ==="
-          find bin/targets -type d 2>/dev/null
-          echo ""
-          find bin/targets -type f 2>/dev/null | head -30
-          echo ""
-
-          echo "=== 6. Check for profiles directory ==="
-          find . -name "profiles" -type d 2>/dev/null
-          echo ""
-          find . -name "*.json" -path "*/rockchip/*" 2>/dev/null | head -20
+          echo "=== Check if profiles dir created after make info ==="
+          find bin/targets -name "profiles" -type d 2>/dev/null
+          find bin/targets -name "*.json" 2>/dev/null | head -10
           echo ""
 
-          echo "=== 7. .targetinfo content ==="
-          find . -name ".targetinfo" -exec cat {} \; 2>/dev/null | grep -A 30 "rumu3f"
-          echo ""
-
-          echo "=== 8. include/image.mk JSON related lines ==="
-          grep -n "json\|JSON\|profiles" include/image.mk 2>/dev/null | head -30
-          echo ""
-
-          echo "=== 9. Check staging_dir image files ==="
-          ls -la staging_dir/target-aarch64_generic_musl/image/ 2>/dev/null
-          echo ""
-
-          echo "=== 10. Check build_dir linux files ==="
-          find build_dir -name "*fine*" -o -name "*rumu3f*" 2>/dev/null | head -20
-          echo ""
-
-          echo "=== 11. Check target/linux/rockchip directory ==="
-          find target/linux/rockchip -type f -name "*.mk" -o -name "*.json" 2>/dev/null
-          echo ""
-
-          echo "=== 12. Full armv8.mk search for fine3399 ==="
-          grep -n "fine\|rumu3f\|FINE" target/linux/rockchip/image/armv8.mk 2>/dev/null
+          echo "=== include/image.mk device generation ==="
+          grep -n "TargetInfo\|targetinfo\|DEVICE_ID\|DEVICE_TITLE\|define Device\|eval.*Device" include/image.mk 2>/dev/null | head -30
           echo ""
 
           mkdir -p ../output
-          echo "debug done" > ../output/debug.txt
+          cp .targetinfo ../output/ 2>/dev/null || true
+          echo "done" > ../output/done.txt
 
       - name: Upload
         uses: actions/upload-artifact@v4
