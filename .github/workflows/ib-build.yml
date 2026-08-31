@@ -22,7 +22,7 @@ jobs:
 
       - name: Build firmware
         run: |
-          set -x
+          set -o pipefail
           TAG=$(curl -s "https://api.github.com/repos/17688838786/QWRT-fine3399/releases/latest" | grep -o '"tag_name": *"[^"]*"' | head -1 | sed 's/.*"tag_name": *"\([^"]*\)".*/\1/')
           echo "Release: $TAG"
           IB_URL=$(curl -s "https://api.github.com/repos/17688838786/QWRT-fine3399/releases/tags/$TAG" | grep -o '"browser_download_url": *"[^"]*imagebuilder[^"]*"' | head -1 | sed 's/.*"browser_download_url": *"\([^"]*\)".*/\1/')
@@ -36,10 +36,10 @@ jobs:
           echo "=== Available profiles ==="
           make info 2>&1 | head -30
           echo "=== Building ==="
-          PKGS="luci luci-i18n-base-zh-cn luci-theme-argon curl wget htop ca-certificates ca-bundle openssl-util ${{ github.event.inputs.packages }}"
+          PKGS="luci luci-i18n-base-zh-cn luci-theme-argon curl wget htop ca-certificates ca-bundle openssl-util -luci-app-accesscontrol -luci-app-filetransfer ${{ github.event.inputs.packages }}"
           echo "Packages: $PKGS"
-          make image PROFILE="rumu3f_fine-3399" PACKAGES="$PKGS" IGNORE_ERRORS=1 2>&1 | tee build.log
-          MAKE_EXIT=$?
+          make image PROFILE="rumu3f_fine-3399" PACKAGES="$PKGS" 2>&1 | tee build.log
+          MAKE_EXIT=${PIPESTATUS[0]}
           echo "=== Make exit code: $MAKE_EXIT ==="
           echo "=== Generated files ==="
           find bin/targets -type f 2>&1
