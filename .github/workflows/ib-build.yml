@@ -22,6 +22,7 @@ jobs:
 
       - name: Build firmware
         run: |
+          set -x
           TAG=$(curl -s "https://api.github.com/repos/17688838786/QWRT-fine3399/releases/latest" | grep -o '"tag_name": *"[^"]*"' | head -1 | sed 's/.*"tag_name": *"\([^"]*\)".*/\1/')
           echo "Release: $TAG"
           IB_URL=$(curl -s "https://api.github.com/repos/17688838786/QWRT-fine3399/releases/tags/$TAG" | grep -o '"browser_download_url": *"[^"]*imagebuilder[^"]*"' | head -1 | sed 's/.*"browser_download_url": *"\([^"]*\)".*/\1/')
@@ -35,9 +36,8 @@ jobs:
           cat target/linux/rockchip/image/Makefile
           echo ""
 
-          echo "=== Inject device definition into armv8.mk ==="
-          cat >> target/linux/rockchip/image/armv8.mk << 'MKEOF'
-
+          echo "=== Create device definition file ==="
+          cat > /tmp/device-def.mk << 'EOF'
 define Device/rumu3f_fine-3399
   DEVICE_VENDOR := RUMU3F
   DEVICE_MODEL := FINE 3399
@@ -49,8 +49,15 @@ define Device/rumu3f_fine-3399
   DEVICE_PACKAGES := brcmfmac-firmware-43430b0-sdio brcmfmac-nvram-43430b0-sdio kmod-brcmfmac kmod-gpio-button-hotplug kmod-usb-net-rtl8152 wpad iwinfo
 endef
 TARGET_DEVICES += rumu3f_fine-3399
-MKEOF
-          echo "Device definition added"
+EOF
+          echo "Device definition file created:"
+          cat /tmp/device-def.mk
+          echo ""
+
+          echo "=== Append to armv8.mk ==="
+          cat /tmp/device-def.mk >> target/linux/rockchip/image/armv8.mk
+          echo "Appended. Last 15 lines of armv8.mk:"
+          tail -15 target/linux/rockchip/image/armv8.mk
           echo ""
 
           echo "=== Setup custom uboot files ==="
@@ -58,17 +65,14 @@ MKEOF
           STAGING_IMG="staging_dir/target-aarch64_generic_musl/image"
           echo "Available uboot files in staging:"
           ls -la "$STAGING_IMG/" 2>/dev/null
-          # Copy idbloader
           if [ -f "$STAGING_IMG/fine3399-rk3399-idbloader.img" ]; then
             cp "$STAGING_IMG/fine3399-rk3399-idbloader.img" files/uboot-custom/idbloader.img
             echo "Copied idbloader.img"
           fi
-          # Copy u-boot.itb
           if [ -f "$STAGING_IMG/fine3399-rk3399-u-boot.itb" ]; then
             cp "$STAGING_IMG/fine3399-rk3399-u-boot.itb" files/uboot-custom/u-boot.itb
             echo "Copied u-boot.itb"
           fi
-          # Copy bl31 (trust)
           if [ -f "$STAGING_IMG/rk3399_bl31.elf" ]; then
             cp "$STAGING_IMG/rk3399_bl31.elf" files/uboot-custom/bl31.elf
             echo "Copied bl31.elf"
