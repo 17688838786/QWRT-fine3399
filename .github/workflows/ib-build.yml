@@ -31,52 +31,77 @@ jobs:
           IB_DIR=$(ls -d openwrt-imagebuilder-* | head -1)
           cd "$IB_DIR"
 
-          echo "=== scripts directory ==="
-          ls -la scripts/
-          echo ""
-          echo "=== json-related scripts ==="
-          find scripts/ -name "*json*" -o -name "*image*" 2>/dev/null
-          echo ""
-          echo "=== json_add_image_info.py content (if exists) ==="
-          cat scripts/json_add_image_info.py 2>/dev/null || echo "NOT FOUND"
-          echo ""
-          echo "=== grep JSON in include/image.mk ==="
-          grep -n -i "json" include/image.mk 2>/dev/null | head -30
-          echo ""
-          echo "=== grep JSON in target/linux/rockchip/image/Makefile ==="
+          echo "=== rockchip image Makefile ==="
           cat target/linux/rockchip/image/Makefile
           echo ""
-          echo "=== target/linux/rockchip/image/armv8.mk ==="
-          cat target/linux/rockchip/image/armv8.mk
+
+          echo "=== Inject device definition into armv8.mk ==="
+          cat >> target/linux/rockchip/image/armv8.mk << 'MKEOF'
+
+define Device/rumu3f_fine-3399
+  DEVICE_VENDOR := RUMU3F
+  DEVICE_MODEL := FINE 3399
+  SOC := rk3399
+  DEVICE_DTS := rk3399-fine-3399
+  UBOOT_DEVICE_NAME := fine3399-rk3399
+  CUSTOM_UBOOT_DIR := $(TOPDIR)/files/uboot-custom
+  IMAGE/sysupgrade.img.gz := boot-common | boot-script | custom-uboot-bin | gzip | append-metadata
+  DEVICE_PACKAGES := brcmfmac-firmware-43430b0-sdio brcmfmac-nvram-43430b0-sdio kmod-brcmfmac kmod-gpio-button-hotplug kmod-usb-net-rtl8152 wpad iwinfo
+endef
+TARGET_DEVICES += rumu3f_fine-3399
+MKEOF
+          echo "Device definition added"
           echo ""
-          echo "=== .config TARGET_ROOTFS_* ==="
-          grep -E "TARGET_ROOTFS|CONFIG_TARGET_ROOTFS" .config | head -20
+
+          echo "=== Setup custom uboot files ==="
+          mkdir -p files/uboot-custom
+          STAGING_IMG="staging_dir/target-aarch64_generic_musl/image"
+          echo "Available uboot files in staging:"
+          ls -la "$STAGING_IMG/" 2>/dev/null
+          # Copy idbloader
+          if [ -f "$STAGING_IMG/fine3399-rk3399-idbloader.img" ]; then
+            cp "$STAGING_IMG/fine3399-rk3399-idbloader.img" files/uboot-custom/idbloader.img
+            echo "Copied idbloader.img"
+          fi
+          # Copy u-boot.itb
+          if [ -f "$STAGING_IMG/fine3399-rk3399-u-boot.itb" ]; then
+            cp "$STAGING_IMG/fine3399-rk3399-u-boot.itb" files/uboot-custom/u-boot.itb
+            echo "Copied u-boot.itb"
+          fi
+          # Copy bl31 (trust)
+          if [ -f "$STAGING_IMG/rk3399_bl31.elf" ]; then
+            cp "$STAGING_IMG/rk3399_bl31.elf" files/uboot-custom/bl31.elf
+            echo "Copied bl31.elf"
+          fi
+          echo "Custom uboot files:"
+          ls -la files/uboot-custom/
           echo ""
-          echo "=== .config JSON related ==="
-          grep -i "json" .config 2>/dev/null | head -10
+
+          echo "=== Verify device in make info ==="
+          make info 2>&1 | grep -A 10 "rumu3f_fine-3399"
           echo ""
-          echo "=== make info for fine3399 ==="
-          make info 2>&1 | grep -A 20 "rumu3f_fine-3399"
-          echo ""
-          echo "=== Build with V=s for verbose output ==="
-          PKGS="luci luci-i18n-base-zh-cn luci-theme-argon -luci-app-accesscontrol -luci-app-filetransfer ${{ github.event.inputs.packages }}"
-          make image PROFILE="rumu3f_fine-3399" PACKAGES="$PKGS" V=s > build_verbose.log 2>&1
+
+          echo "=== Building ==="
+          PKGS="luci luci-i18n-base-zh-cn luci-theme-argon curl wget htop ca-certificates ca-bundle openssl-util -luci-app-accesscontrol -luci-app-filetransfer ${{ github.event.inputs.packages }}"
+          echo "Packages: $PKGS"
+          make image PROFILE="rumu3f_fine-3399" PACKAGES="$PKGS" V=s > build.log 2>&1
           MAKE_EXIT=$?
-          echo "Make exit: $MAKE_EXIT"
-          echo "=== Build log - image building section ==="
-          grep -n -i "building image\|json\|img\.gz\|rootfs\|mkfs\|dd if\|Image/Build" build_verbose.log | head -50
-          echo ""
-          echo "=== Build log last 80 lines ==="
-          tail -80 build_verbose.log
-          echo ""
+          echo "=== Make exit code: $MAKE_EXIT ==="
+          echo "=== Build log (last 200 lines) ==="
+          tail -200 build.log
           echo "=== Generated files ==="
           find bin/targets -type f 2>&1
           mkdir -p ../output
           find bin/targets -type f -name "*.img.gz" -exec cp {} ../output/ \; 2>&1
           find bin/targets -type f -name "*rootfs*.tar.gz" -exec cp {} ../output/ \; 2>&1
-          cp build_verbose.log ../output/ 2>&1
-          echo "=== Output ==="
-          ls -lh ../output/
+          find bin/targets -type f -name "*.manifest" -exec cp {} ../output/ \; 2>&1
+          cp build.log ../output/ 2>&1
+          echo "=== Output files ==="
+          ls -lh ../output/ 2>&1
+          if [ $MAKE_EXIT -ne 0 ]; then
+            echo "=== Build failed ==="
+            exit 1
+          fi
 
       - name: Upload
         uses: actions/upload-artifact@v4
