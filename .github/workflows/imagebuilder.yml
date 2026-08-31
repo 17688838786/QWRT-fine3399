@@ -62,7 +62,7 @@ jobs:
         run: |
           tar -xf imagebuilder.tar.xz
           IB_DIR=$(ls -d openwrt-imagebuilder-* 2>/dev/null | head -1)
-          echo "ib_dir=$IB_DIR" >> $GITHUB_ENV
+          echo "IB_DIR=$IB_DIR" >> $GITHUB_ENV
           echo "ImageBuilder 目录: $IB_DIR"
           ls -la "$IB_DIR"
 
