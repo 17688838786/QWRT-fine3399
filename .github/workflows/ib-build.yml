@@ -32,14 +32,20 @@ jobs:
           IB_DIR=$(ls -d openwrt-imagebuilder-* | head -1)
           echo "IB_DIR: $IB_DIR"
           cd "$IB_DIR"
-          PKGS="luci luci-i18n-base-zh-cn luci-theme-argon kmod-ath11k-ahb kmod-ath11k-pci ath11k-firmware-qcn6855 kmod-usb-net-qmi-wwan kmod-usb-serial-option kmod-fs-ext4 kmod-fs-vfat block-mount e2fsprogs dosfstools curl wget nano htop ca-certificates ca-bundle openssl-util zoneinfo-asia ${{ github.event.inputs.packages }}"
-          make image PROFILE="rumu3f_fine-3399" PACKAGES="$PKGS" 2>&1 | tail -30
+          echo "=== Available profiles ==="
+          make info | head -50
+          echo "=== Building ==="
+          PKGS="luci luci-i18n-base-zh-cn luci-theme-argon curl wget nano htop ca-certificates ca-bundle openssl-util zoneinfo-asia ${{ github.event.inputs.packages }}"
+          make image PROFILE="rumu3f_fine-3399" PACKAGES="$PKGS" 2>&1 | tee build.log | tail -50
+          echo "=== Build result ==="
+          echo "Exit code: $?"
           echo "=== Generated files ==="
           find bin/targets -type f
           mkdir -p ../output
           find bin/targets -type f -name "*.img.gz" -exec cp {} ../output/ \;
           find bin/targets -type f -name "*rootfs*.tar.gz" -exec cp {} ../output/ \;
           find bin/targets -type f -name "*.manifest" -exec cp {} ../output/ \;
+          cp build.log ../output/
           echo "=== Output files ==="
           ls -lh ../output/
 
