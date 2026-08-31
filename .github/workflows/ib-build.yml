@@ -32,6 +32,23 @@ jobs:
           IB_DIR=$(ls -d openwrt-imagebuilder-* | head -1)
           cd "$IB_DIR"
 
+          echo "=== Setup uboot files in /tmp ==="
+          mkdir -p /tmp/uboot-files
+          STAGING_IMG="staging_dir/target-aarch64_generic_musl/image"
+          if [ -f "$STAGING_IMG/fine3399-rk3399-idbloader.img" ]; then
+            cp "$STAGING_IMG/fine3399-rk3399-idbloader.img" /tmp/uboot-files/idbloader.img
+            echo "Copied idbloader.img"
+          fi
+          if [ -f "$STAGING_IMG/fine3399-rk3399-u-boot.itb" ]; then
+            cp "$STAGING_IMG/fine3399-rk3399-u-boot.itb" /tmp/uboot-files/u-boot.itb
+            echo "Copied u-boot.itb"
+          fi
+          if [ -f "$STAGING_IMG/rk3399_bl31.elf" ]; then
+            cp "$STAGING_IMG/rk3399_bl31.elf" /tmp/uboot-files/bl31.elf
+            echo "Copied bl31.elf"
+          fi
+          ls -la /tmp/uboot-files/
+
           echo "=== Inject device definition ==="
           DEVFILE=/tmp/device-def.mk
           printf 'define Device/rumu3f_fine-3399\n' > "$DEVFILE"
@@ -40,7 +57,7 @@ jobs:
           printf '  SOC := rk3399\n' >> "$DEVFILE"
           printf '  DEVICE_DTS := rk3399-fine-3399\n' >> "$DEVFILE"
           printf '  UBOOT_DEVICE_NAME := fine3399-rk3399\n' >> "$DEVFILE"
-          printf '  CUSTOM_UBOOT_DIR := $(TOPDIR)/files/uboot-custom\n' >> "$DEVFILE"
+          printf '  CUSTOM_UBOOT_DIR := /tmp/uboot-files\n' >> "$DEVFILE"
           printf '  IMAGE/sysupgrade.img.gz := boot-common | boot-script | custom-uboot-bin | gzip | append-metadata\n' >> "$DEVFILE"
           printf '  DEVICE_PACKAGES := brcmfmac-firmware-43430b0-sdio brcmfmac-nvram-43430b0-sdio kmod-brcmfmac kmod-gpio-button-hotplug kmod-usb-net-rtl8152 wpad iwinfo\n' >> "$DEVFILE"
           printf 'endef\n' >> "$DEVFILE"
@@ -48,55 +65,39 @@ jobs:
           cat "$DEVFILE" >> target/linux/rockchip/image/armv8.mk
           echo "Appended to armv8.mk"
 
-          echo "=== Setup custom uboot files ==="
-          mkdir -p files/uboot-custom
-          STAGING_IMG="staging_dir/target-aarch64_generic_musl/image"
-          if [ -f "$STAGING_IMG/fine3399-rk3399-idbloader.img" ]; then
-            cp "$STAGING_IMG/fine3399-rk3399-idbloader.img" files/uboot-custom/idbloader.img
-          fi
-          if [ -f "$STAGING_IMG/fine3399-rk3399-u-boot.itb" ]; then
-            cp "$STAGING_IMG/fine3399-rk3399-u-boot.itb" files/uboot-custom/u-boot.itb
-          fi
-          if [ -f "$STAGING_IMG/rk3399_bl31.elf" ]; then
-            cp "$STAGING_IMG/rk3399_bl31.elf" files/uboot-custom/bl31.elf
-          fi
-
-          echo "=== Copy custom files (GPIO138 + WiFi default) ==="
+          echo "=== Copy custom files to files/ ==="
           CUSTOM_DIR="$GITHUB_WORKSPACE/files"
-          CUSTOM_ROOT="$PWD/custom_files"
-          mkdir -p "$CUSTOM_ROOT/etc/init.d"
-          mkdir -p "$CUSTOM_ROOT/etc/config"
-          mkdir -p "$CUSTOM_ROOT/usr/bin"
-          mkdir -p "$CUSTOM_ROOT/etc/uci-defaults"
-          # 复制 GPIO138 控制脚本
+          mkdir -p files/etc/init.d
+          mkdir -p files/etc/config
+          mkdir -p files/usr/bin
+          mkdir -p files/etc/uci-defaults
           if [ -f "$CUSTOM_DIR/etc/init.d/gpio138" ]; then
-            cp "$CUSTOM_DIR/etc/init.d/gpio138" "$CUSTOM_ROOT/etc/init.d/gpio138"
-            chmod +x "$CUSTOM_ROOT/etc/init.d/gpio138"
+            cp "$CUSTOM_DIR/etc/init.d/gpio138" files/etc/init.d/gpio138
+            chmod +x files/etc/init.d/gpio138
             echo "Copied gpio138 init.d"
           fi
           if [ -f "$CUSTOM_DIR/etc/config/gpio138" ]; then
-            cp "$CUSTOM_DIR/etc/config/gpio138" "$CUSTOM_ROOT/etc/config/gpio138"
+            cp "$CUSTOM_DIR/etc/config/gpio138" files/etc/config/gpio138
             echo "Copied gpio138 config"
           fi
           if [ -f "$CUSTOM_DIR/usr/bin/gpio138-ctl" ]; then
-            cp "$CUSTOM_DIR/usr/bin/gpio138-ctl" "$CUSTOM_ROOT/usr/bin/gpio138-ctl"
-            chmod +x "$CUSTOM_ROOT/usr/bin/gpio138-ctl"
+            cp "$CUSTOM_DIR/usr/bin/gpio138-ctl" files/usr/bin/gpio138-ctl
+            chmod +x files/usr/bin/gpio138-ctl
             echo "Copied gpio138-ctl"
           fi
-          # 复制 WiFi 默认配置（含 gpio138 enable）
           if [ -f "$CUSTOM_DIR/etc/uci-defaults/99-wifi-default" ]; then
-            cp "$CUSTOM_DIR/etc/uci-defaults/99-wifi-default" "$CUSTOM_ROOT/etc/uci-defaults/99-wifi-default"
-            chmod +x "$CUSTOM_ROOT/etc/uci-defaults/99-wifi-default"
+            cp "$CUSTOM_DIR/etc/uci-defaults/99-wifi-default" files/etc/uci-defaults/99-wifi-default
+            chmod +x files/etc/uci-defaults/99-wifi-default
             echo "Copied 99-wifi-default"
           fi
-          echo "Custom files:"
-          find "$CUSTOM_ROOT" -type f 2>/dev/null
+          echo "Custom files in files/:"
+          find files -type f 2>/dev/null
           echo ""
 
           echo "=== Building ==="
           PKGS="luci luci-i18n-base-zh-cn luci-theme-argon curl wget htop ca-certificates ca-bundle openssl-util -luci-app-accesscontrol -luci-app-filetransfer ${{ github.event.inputs.packages }}"
           echo "Packages: $PKGS"
-          make image PROFILE="rumu3f_fine-3399" PACKAGES="$PKGS" FILES="custom_files" V=s > build.log 2>&1
+          make image PROFILE="rumu3f_fine-3399" PACKAGES="$PKGS" FILES="files" V=s > build.log 2>&1
           MAKE_EXIT=$?
           echo "=== Make exit code: $MAKE_EXIT ==="
           echo "=== Build log (last 200 lines) ==="
