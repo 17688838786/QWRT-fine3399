@@ -71,6 +71,12 @@ uci commit wireless
 
 logger -t wifi-default "WiFi configured: SSID=FNet-5G, channel=36, VHT160, country=US, bind=LAN"
 
+# 启用 GPIO138 开机自启
+if [ -f /etc/init.d/gpio138 ]; then
+    /etc/init.d/gpio138 enable
+    logger -t gpio138 "GPIO138 service enabled on boot"
+fi
+
 # 重启 WiFi
 wifi reload 2>/dev/null || wifi up 2>/dev/null
 
