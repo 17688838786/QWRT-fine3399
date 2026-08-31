@@ -132,12 +132,15 @@ fi
 # === PWM 风扇驱动配置结束 ===
 
 # === GPIO138 控制 + WiFi 默认配置 ===
-if [ -f files/etc/init.d/gpio138 ]; then
-    chmod +x files/etc/init.d/gpio138
-    chmod +x files/usr/bin/gpio138-ctl 2>/dev/null || true
-    chmod +x files/etc/uci-defaults/99-wifi-default 2>/dev/null || true
-    mkdir -p files/etc/rc.d
-    ln -sf ../init.d/gpio138 files/etc/rc.d/S99gpio138
-    echo "GPIO138 control + WiFi default config enabled"
-fi
+echo "=== GPIO138 debug: files dir check ==="
+ls -la files/etc/init.d/ 2>/dev/null || echo "files/etc/init.d/ NOT FOUND"
+ls -la files/etc/uci-defaults/ 2>/dev/null || echo "files/etc/uci-defaults/ NOT FOUND"
+chmod +x files/etc/init.d/gpio138 2>/dev/null && echo "chmod gpio138 OK" || echo "chmod gpio138 FAILED"
+chmod +x files/usr/bin/gpio138-ctl 2>/dev/null && echo "chmod gpio138-ctl OK" || echo "chmod gpio138-ctl FAILED"
+chmod +x files/etc/uci-defaults/99-wifi-default 2>/dev/null && echo "chmod 99-wifi-default OK" || echo "chmod 99-wifi-default FAILED"
+mkdir -p files/etc/rc.d
+ln -sf ../init.d/gpio138 files/etc/rc.d/S99gpio138 2>/dev/null && echo "ln S99gpio138 OK" || echo "ln S99gpio138 FAILED"
+echo "GPIO138 control + WiFi default config setup done"
+echo "=== GPIO138 debug: final check ==="
+ls -la files/etc/init.d/gpio138 files/etc/rc.d/S99gpio138 files/etc/uci-defaults/99-wifi-default 2>/dev/null || true
 # === GPIO138 配置结束 ===
