@@ -1,0 +1,118 @@
+#!/bin/sh
+# GPIO 138 Control Script
+# 开机后拉低3秒再拉高
+
+GPIO_PIN=138
+DELAY_LOW=3
+SYSFS_GPIO="/sys/class/gpio/gpio${GPIO_PIN}"
+
+log() {
+    logger -t gpio138 "$1"
+    echo "[gpio138] $1"
+}
+
+gpio_export() {
+    if [ ! -d "$SYSFS_GPIO" ]; then
+        echo "$GPIO_PIN" > /sys/class/gpio/export 2>/dev/null
+        sleep 0.1
+    fi
+}
+
+gpio_unexport() {
+    if [ -d "$SYSFS_GPIO" ]; then
+        echo "$GPIO_PIN" > /sys/class/gpio/unexport 2>/dev/null
+    fi
+}
+
+gpio_set_direction() {
+    echo "$1" > "$SYSFS_GPIO/direction" 2>/dev/null
+}
+
+gpio_set_value() {
+    echo "$1" > "$SYSFS_GPIO/value" 2>/dev/null
+}
+
+gpio_get_value() {
+    cat "$SYSFS_GPIO/value" 2>/dev/null
+}
+
+do_start() {
+    # 读取配置
+    local enabled pin delay_low
+    enabled=$(uci -q get gpio138.control.enabled 2>/dev/null || echo "1")
+    pin=$(uci -q get gpio138.control.pin 2>/dev/null || echo "138")
+    delay_low=$(uci -q get gpio138.control.delay_low 2>/dev/null || echo "3")
+
+    GPIO_PIN=$pin
+    DELAY_LOW=$delay_low
+    SYSFS_GPIO="/sys/class/gpio/gpio${GPIO_PIN}"
+
+    if [ "$enabled" != "1" ]; then
+        log "GPIO ${GPIO_PIN} control disabled in config"
+        return 0
+    fi
+
+    log "Starting GPIO ${GPIO_PIN} control: pull low for ${DELAY_LOW}s then pull high"
+
+    # 导出 GPIO
+    gpio_export
+
+    # 设置为输出
+    gpio_set_direction "out"
+
+    # 拉低
+    gpio_set_value "0"
+    log "GPIO ${GPIO_PIN} pulled LOW"
+
+    # 等待指定秒数
+    sleep "$DELAY_LOW"
+
+    # 拉高
+    gpio_set_value "1"
+    log "GPIO ${GPIO_PIN} pulled HIGH after ${DELAY_LOW}s"
+
+    # 保持导出状态，方便后续查询
+    log "GPIO ${GPIO_PIN} control completed, current value: $(gpio_get_value)"
+}
+
+do_stop() {
+    log "Stopping GPIO ${GPIO_PIN} control (unexport)"
+    gpio_unexport
+}
+
+do_restart() {
+    do_stop
+    sleep 0.5
+    do_start
+}
+
+do_status() {
+    if [ -d "$SYSFS_GPIO" ]; then
+        echo "GPIO ${GPIO_PIN}: exported"
+        echo "  direction: $(cat $SYSFS_GPIO/direction 2>/dev/null)"
+        echo "  value: $(cat $SYSFS_GPIO/value 2>/dev/null)"
+    else
+        echo "GPIO ${GPIO_PIN}: not exported"
+    fi
+}
+
+case "$1" in
+    start)
+        do_start
+        ;;
+    stop)
+        do_stop
+        ;;
+    restart)
+        do_restart
+        ;;
+    status)
+        do_status
+        ;;
+    *)
+        echo "Usage: $0 {start|stop|restart|status}"
+        exit 1
+        ;;
+esac
+
+exit 0
