@@ -1,0 +1,6 @@
+config gpio138 'control'
+	option enabled '1'
+	option pin '138'
+	option delay_low '3'
+	option initial_state 'low'
+	option final_state 'high'
