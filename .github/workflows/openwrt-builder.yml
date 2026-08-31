@@ -74,7 +74,15 @@ jobs:
 
     - name: Load custom configuration
       run: |
-        [ -e files ] && mv files openwrt/files
+        if [ -d files ]; then
+          mkdir -p openwrt/files
+          cp -r files/* openwrt/files/
+          echo "files/ directory copied to openwrt/files/"
+          ls -la openwrt/files/etc/init.d/ 2>/dev/null || echo "no etc/init.d in files"
+          ls -la openwrt/files/etc/uci-defaults/ 2>/dev/null || echo "no etc/uci-defaults in files"
+        else
+          echo "WARNING: files/ directory not found!"
+        fi
         [ -e $CONFIG_FILE ] && mv $CONFIG_FILE openwrt/.config
         chmod +x $DIY_P2_SH
         cd openwrt
