@@ -13,4 +13,4 @@ jobs:
     runs-on: ubuntu-22.04
     steps:
       - name: Test
-        run: echo "Inputs test - packages: ${{ github.event.inputs.packages }}"
+        run: echo 'Hello from ImageBuilder'
