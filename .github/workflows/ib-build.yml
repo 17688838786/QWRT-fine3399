@@ -20,7 +20,7 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y build-essential clang flex bison g++ gawk gettext git libncurses-dev libssl-dev rsync unzip zlib1g-dev file wget xz-utils
 
-      - name: Build firmware
+      - name: Debug
         run: |
           set -x
           TAG=$(curl -s "https://api.github.com/repos/17688838786/QWRT-fine3399/releases/latest" | grep -o '"tag_name": *"[^"]*"' | head -1 | sed 's/.*"tag_name": *"\([^"]*\)".*/\1/')
@@ -32,80 +32,64 @@ jobs:
           IB_DIR=$(ls -d openwrt-imagebuilder-* | head -1)
           cd "$IB_DIR"
 
-          echo "=== rockchip image Makefile ==="
+          echo "=== 1. Search all files containing rumu3f ==="
+          grep -rl "rumu3f" . 2>/dev/null | head -20
+          echo ""
+
+          echo "=== 2. Search all files containing fine-3399 ==="
+          grep -rl "fine-3399\|fine3399" . 2>/dev/null | head -20
+          echo ""
+
+          echo "=== 3. rockchip image Makefile ==="
           cat target/linux/rockchip/image/Makefile
           echo ""
 
-          echo "=== Inject device definition ==="
-          DEVFILE=/tmp/device-def.mk
-          printf 'define Device/rumu3f_fine-3399\n' > "$DEVFILE"
-          printf '  DEVICE_VENDOR := RUMU3F\n' >> "$DEVFILE"
-          printf '  DEVICE_MODEL := FINE 3399\n' >> "$DEVFILE"
-          printf '  SOC := rk3399\n' >> "$DEVFILE"
-          printf '  DEVICE_DTS := rk3399-fine-3399\n' >> "$DEVFILE"
-          printf '  UBOOT_DEVICE_NAME := fine3399-rk3399\n' >> "$DEVFILE"
-          printf '  CUSTOM_UBOOT_DIR := $(TOPDIR)/files/uboot-custom\n' >> "$DEVFILE"
-          printf '  IMAGE/sysupgrade.img.gz := boot-common | boot-script | custom-uboot-bin | gzip | append-metadata\n' >> "$DEVFILE"
-          printf '  DEVICE_PACKAGES := brcmfmac-firmware-43430b0-sdio brcmfmac-nvram-43430b0-sdio kmod-brcmfmac kmod-gpio-button-hotplug kmod-usb-net-rtl8152 wpad iwinfo\n' >> "$DEVFILE"
-          printf 'endef\n' >> "$DEVFILE"
-          printf 'TARGET_DEVICES += rumu3f_fine-3399\n' >> "$DEVFILE"
-          echo "Device definition:"
-          cat "$DEVFILE"
-          echo ""
-          cat "$DEVFILE" >> target/linux/rockchip/image/armv8.mk
-          echo "Appended to armv8.mk"
+          echo "=== 4. Check if device def in image/Makefile ==="
+          grep -n "rumu3f\|fine-3399\|fine3399" target/linux/rockchip/image/Makefile 2>/dev/null
           echo ""
 
-          echo "=== Setup custom uboot files ==="
-          mkdir -p files/uboot-custom
-          STAGING_IMG="staging_dir/target-aarch64_generic_musl/image"
-          echo "Available uboot files in staging:"
-          ls -la "$STAGING_IMG/" 2>/dev/null
-          if [ -f "$STAGING_IMG/fine3399-rk3399-idbloader.img" ]; then
-            cp "$STAGING_IMG/fine3399-rk3399-idbloader.img" files/uboot-custom/idbloader.img
-            echo "Copied idbloader.img"
-          fi
-          if [ -f "$STAGING_IMG/fine3399-rk3399-u-boot.itb" ]; then
-            cp "$STAGING_IMG/fine3399-rk3399-u-boot.itb" files/uboot-custom/u-boot.itb
-            echo "Copied u-boot.itb"
-          fi
-          if [ -f "$STAGING_IMG/rk3399_bl31.elf" ]; then
-            cp "$STAGING_IMG/rk3399_bl31.elf" files/uboot-custom/bl31.elf
-            echo "Copied bl31.elf"
-          fi
-          echo "Custom uboot files:"
-          ls -la files/uboot-custom/
+          echo "=== 5. bin/targets directory structure ==="
+          find bin/targets -type d 2>/dev/null
+          echo ""
+          find bin/targets -type f 2>/dev/null | head -30
           echo ""
 
-          echo "=== Verify device in make info ==="
-          make info 2>&1 | grep -A 10 "rumu3f_fine-3399"
+          echo "=== 6. Check for profiles directory ==="
+          find . -name "profiles" -type d 2>/dev/null
+          echo ""
+          find . -name "*.json" -path "*/rockchip/*" 2>/dev/null | head -20
           echo ""
 
-          echo "=== Building ==="
-          PKGS="luci luci-i18n-base-zh-cn luci-theme-argon curl wget htop ca-certificates ca-bundle openssl-util -luci-app-accesscontrol -luci-app-filetransfer ${{ github.event.inputs.packages }}"
-          echo "Packages: $PKGS"
-          make image PROFILE="rumu3f_fine-3399" PACKAGES="$PKGS" V=s > build.log 2>&1
-          MAKE_EXIT=$?
-          echo "=== Make exit code: $MAKE_EXIT ==="
-          echo "=== Build log (last 200 lines) ==="
-          tail -200 build.log
-          echo "=== Generated files ==="
-          find bin/targets -type f 2>&1
+          echo "=== 7. .targetinfo content ==="
+          find . -name ".targetinfo" -exec cat {} \; 2>/dev/null | grep -A 30 "rumu3f"
+          echo ""
+
+          echo "=== 8. include/image.mk JSON related lines ==="
+          grep -n "json\|JSON\|profiles" include/image.mk 2>/dev/null | head -30
+          echo ""
+
+          echo "=== 9. Check staging_dir image files ==="
+          ls -la staging_dir/target-aarch64_generic_musl/image/ 2>/dev/null
+          echo ""
+
+          echo "=== 10. Check build_dir linux files ==="
+          find build_dir -name "*fine*" -o -name "*rumu3f*" 2>/dev/null | head -20
+          echo ""
+
+          echo "=== 11. Check target/linux/rockchip directory ==="
+          find target/linux/rockchip -type f -name "*.mk" -o -name "*.json" 2>/dev/null
+          echo ""
+
+          echo "=== 12. Full armv8.mk search for fine3399 ==="
+          grep -n "fine\|rumu3f\|FINE" target/linux/rockchip/image/armv8.mk 2>/dev/null
+          echo ""
+
           mkdir -p ../output
-          find bin/targets -type f -name "*.img.gz" -exec cp {} ../output/ \; 2>&1
-          find bin/targets -type f -name "*rootfs*.tar.gz" -exec cp {} ../output/ \; 2>&1
-          find bin/targets -type f -name "*.manifest" -exec cp {} ../output/ \; 2>&1
-          cp build.log ../output/ 2>&1
-          echo "=== Output files ==="
-          ls -lh ../output/ 2>&1
-          if [ $MAKE_EXIT -ne 0 ]; then
-            echo "=== Build failed ==="
-            exit 1
-          fi
+          echo "debug done" > ../output/debug.txt
 
       - name: Upload
         uses: actions/upload-artifact@v4
         with:
-          name: OpenWrt_firmware
+          name: OpenWrt_debug
           path: output/
-          retention-days: 30
+          retention-days: 7
