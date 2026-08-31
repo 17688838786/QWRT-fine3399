@@ -7,5 +7,14 @@ jobs:
   build:
     runs-on: ubuntu-22.04
     steps:
-      - name: Hello
-        run: echo "Hello from ImageBuilder"
+      - name: Checkout
+        uses: actions/checkout@main
+
+      - name: Install deps
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y wget curl xz-utils
+          echo "Install done"
+
+      - name: Test
+        run: echo "Workflow works!"
