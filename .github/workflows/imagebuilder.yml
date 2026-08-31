@@ -121,30 +121,29 @@ jobs:
           echo "生成的文件:"
           find bin/targets -name "*.img*" -o -name "*.tar.gz" | head -20
 
-      - name: 检查生成结果
+      - name: 检查生成结果并复制产物
         run: |
           IB_DIR="${{ env.IB_DIR }}"
-          cd "$IB_DIR"
+          mkdir -p output
           
           echo "=== 生成的固件 ==="
-          ls -lh bin/targets/${{ env.TARGET }}/*.img* 2>/dev/null || echo "未找到 img 文件"
+          ls -lh "$IB_DIR"/bin/targets/${{ env.TARGET }}/*.img* 2>/dev/null || echo "未找到 img 文件"
           
           echo ""
-          echo "=== 生成的 rootfs ==="
-          ls -lh bin/targets/${{ env.TARGET }}/*rootfs* 2>/dev/null || echo "未找到 rootfs"
+          echo "=== 复制产物到 output 目录 ==="
+          cp -v "$IB_DIR"/bin/targets/${{ env.TARGET }}/*.img.gz output/ 2>/dev/null || true
+          cp -v "$IB_DIR"/bin/targets/${{ env.TARGET }}/*rootfs*.tar.gz output/ 2>/dev/null || true
+          cp -v "$IB_DIR"/bin/targets/${{ env.TARGET }}/*.manifest output/ 2>/dev/null || true
           
           echo ""
-          echo "=== 所有产物 ==="
-          find bin/targets -type f -size +1M 2>/dev/null | head -20
+          echo "=== output 目录内容 ==="
+          ls -lh output/
 
       - name: 上传固件产物
         uses: actions/upload-artifact@v4
         with:
-          name: OpenWrt_firmware_${{ env.PROFILE }}_${{ steps.release.outputs.tag }}
-          path: |
-            ${{ env.IB_DIR }}/bin/targets/${{ env.TARGET }}/*.img.gz
-            ${{ env.IB_DIR }}/bin/targets/${{ env.TARGET }}/*rootfs*.tar.gz
-            ${{ env.IB_DIR }}/bin/targets/${{ env.TARGET }}/*.manifest
+          name: OpenWrt_firmware_${{ env.PROFILE }}
+          path: output/
           retention-days: 30
           if-no-files-found: error
 
