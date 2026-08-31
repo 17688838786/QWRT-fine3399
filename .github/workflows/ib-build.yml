@@ -22,6 +22,7 @@ jobs:
 
       - name: Build firmware
         run: |
+          set -x
           TAG=$(curl -s "https://api.github.com/repos/17688838786/QWRT-fine3399/releases/latest" | grep -o '"tag_name": *"[^"]*"' | head -1 | sed 's/.*"tag_name": *"\([^"]*\)".*/\1/')
           echo "Release: $TAG"
           IB_URL=$(curl -s "https://api.github.com/repos/17688838786/QWRT-fine3399/releases/tags/$TAG" | grep -o '"browser_download_url": *"[^"]*imagebuilder[^"]*"' | head -1 | sed 's/.*"browser_download_url": *"\([^"]*\)".*/\1/')
@@ -32,18 +33,30 @@ jobs:
           IB_DIR=$(ls -d openwrt-imagebuilder-* | head -1)
           echo "IB_DIR: $IB_DIR"
           cd "$IB_DIR"
+          echo "=== Available profiles ==="
+          make info 2>&1 | head -30
+          echo "=== Building ==="
           PKGS="luci luci-i18n-base-zh-cn luci-theme-argon curl wget htop ca-certificates ca-bundle openssl-util ${{ github.event.inputs.packages }}"
-          make image PROFILE="rumu3f_fine-3399" PACKAGES="$PKGS" IGNORE_ERRORS=1 2>&1 | tee build.log | tail -50
-          echo "=== Build exit code: $? ==="
+          echo "Packages: $PKGS"
+          make image PROFILE="rumu3f_fine-3399" PACKAGES="$PKGS" IGNORE_ERRORS=1 2>&1 | tee build.log
+          MAKE_EXIT=$?
+          echo "=== Make exit code: $MAKE_EXIT ==="
           echo "=== Generated files ==="
-          find bin/targets -type f
+          find bin/targets -type f 2>&1
           mkdir -p ../output
-          find bin/targets -type f -name "*.img.gz" -exec cp {} ../output/ \;
-          find bin/targets -type f -name "*rootfs*.tar.gz" -exec cp {} ../output/ \;
-          find bin/targets -type f -name "*.manifest" -exec cp {} ../output/ \;
-          cp build.log ../output/
+          find bin/targets -type f -name "*.img.gz" -exec cp {} ../output/ \; 2>&1
+          find bin/targets -type f -name "*rootfs*.tar.gz" -exec cp {} ../output/ \; 2>&1
+          find bin/targets -type f -name "*.manifest" -exec cp {} ../output/ \; 2>&1
+          cp build.log ../output/ 2>&1
           echo "=== Output files ==="
-          ls -lh ../output/
+          ls -lh ../output/ 2>&1
+          echo "=== Disk space ==="
+          df -h
+          if [ $MAKE_EXIT -ne 0 ]; then
+            echo "=== Build failed, showing last 100 lines of log ==="
+            tail -100 build.log
+            exit 1
+          fi
 
       - name: Upload
         uses: actions/upload-artifact@v4
