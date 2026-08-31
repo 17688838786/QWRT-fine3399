@@ -20,48 +20,107 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y build-essential clang flex bison g++ gawk gettext git libncurses-dev libssl-dev rsync unzip zlib1g-dev file wget xz-utils
 
-      - name: Debug targetinfo
+      - name: Build firmware
         run: |
+          set -x
           TAG=$(curl -s "https://api.github.com/repos/17688838786/QWRT-fine3399/releases/latest" | grep -o '"tag_name": *"[^"]*"' | head -1 | sed 's/.*"tag_name": *"\([^"]*\)".*/\1/')
+          echo "Release: $TAG"
           IB_URL=$(curl -s "https://api.github.com/repos/17688838786/QWRT-fine3399/releases/tags/$TAG" | grep -o '"browser_download_url": *"[^"]*imagebuilder[^"]*"' | head -1 | sed 's/.*"browser_download_url": *"\([^"]*\)".*/\1/')
+          echo "IB: $IB_URL"
           wget -q -O ib.tar.xz "$IB_URL"
           tar -xf ib.tar.xz
           IB_DIR=$(ls -d openwrt-imagebuilder-* | head -1)
           cd "$IB_DIR"
 
-          echo "=== .targetinfo full content for rumu3f ==="
-          grep -A 50 "rumu3f" .targetinfo || true
+          echo "=== Inject device definition ==="
+          DEVFILE=/tmp/device-def.mk
+          printf 'define Device/rumu3f_fine-3399\n' > "$DEVFILE"
+          printf '  DEVICE_VENDOR := RUMU3F\n' >> "$DEVFILE"
+          printf '  DEVICE_MODEL := FINE 3399\n' >> "$DEVFILE"
+          printf '  SOC := rk3399\n' >> "$DEVFILE"
+          printf '  DEVICE_DTS := rk3399-fine-3399\n' >> "$DEVFILE"
+          printf '  UBOOT_DEVICE_NAME := fine3399-rk3399\n' >> "$DEVFILE"
+          printf '  CUSTOM_UBOOT_DIR := $(TOPDIR)/files/uboot-custom\n' >> "$DEVFILE"
+          printf '  IMAGE/sysupgrade.img.gz := boot-common | boot-script | custom-uboot-bin | gzip | append-metadata\n' >> "$DEVFILE"
+          printf '  DEVICE_PACKAGES := brcmfmac-firmware-43430b0-sdio brcmfmac-nvram-43430b0-sdio kmod-brcmfmac kmod-gpio-button-hotplug kmod-usb-net-rtl8152 wpad iwinfo\n' >> "$DEVFILE"
+          printf 'endef\n' >> "$DEVFILE"
+          printf 'TARGET_DEVICES += rumu3f_fine-3399\n' >> "$DEVFILE"
+          cat "$DEVFILE" >> target/linux/rockchip/image/armv8.mk
+          echo "Appended to armv8.mk"
+
+          echo "=== Setup custom uboot files ==="
+          mkdir -p files/uboot-custom
+          STAGING_IMG="staging_dir/target-aarch64_generic_musl/image"
+          if [ -f "$STAGING_IMG/fine3399-rk3399-idbloader.img" ]; then
+            cp "$STAGING_IMG/fine3399-rk3399-idbloader.img" files/uboot-custom/idbloader.img
+          fi
+          if [ -f "$STAGING_IMG/fine3399-rk3399-u-boot.itb" ]; then
+            cp "$STAGING_IMG/fine3399-rk3399-u-boot.itb" files/uboot-custom/u-boot.itb
+          fi
+          if [ -f "$STAGING_IMG/rk3399_bl31.elf" ]; then
+            cp "$STAGING_IMG/rk3399_bl31.elf" files/uboot-custom/bl31.elf
+          fi
+
+          echo "=== Copy custom files (GPIO138 + WiFi default) ==="
+          CUSTOM_DIR="$GITHUB_WORKSPACE/files"
+          mkdir -p files/etc/init.d
+          mkdir -p files/etc/config
+          mkdir -p files/usr/bin
+          mkdir -p files/etc/uci-defaults
+          mkdir -p files/etc/rc.d
+          # 复制 GPIO138 控制脚本
+          if [ -f "$CUSTOM_DIR/etc/init.d/gpio138" ]; then
+            cp "$CUSTOM_DIR/etc/init.d/gpio138" files/etc/init.d/gpio138
+            chmod +x files/etc/init.d/gpio138
+            echo "Copied gpio138 init.d"
+          fi
+          if [ -f "$CUSTOM_DIR/etc/config/gpio138" ]; then
+            cp "$CUSTOM_DIR/etc/config/gpio138" files/etc/config/gpio138
+            echo "Copied gpio138 config"
+          fi
+          if [ -f "$CUSTOM_DIR/usr/bin/gpio138-ctl" ]; then
+            cp "$CUSTOM_DIR/usr/bin/gpio138-ctl" files/usr/bin/gpio138-ctl
+            chmod +x files/usr/bin/gpio138-ctl
+            echo "Copied gpio138-ctl"
+          fi
+          # 复制 WiFi 默认配置
+          if [ -f "$CUSTOM_DIR/etc/uci-defaults/99-wifi-default" ]; then
+            cp "$CUSTOM_DIR/etc/uci-defaults/99-wifi-default" files/etc/uci-defaults/99-wifi-default
+            chmod +x files/etc/uci-defaults/99-wifi-default
+            echo "Copied 99-wifi-default"
+          fi
+          # 创建开机自启符号链接
+          ln -sf ../init.d/gpio138 files/etc/rc.d/S99gpio138
+          echo "Created S99gpio138 symlink"
+          echo "Custom files in ImageBuilder:"
+          find files/etc files/usr -type f 2>/dev/null
           echo ""
 
-          echo "=== .targetinfo first 30 lines (format) ==="
-          head -30 .targetinfo
-          echo ""
-
-          echo "=== How ImageBuilder generates device defs ==="
-          grep -rn "targetinfo\|TargetInfo\|DEVICE_INFO\|json_add" include/ scripts/ 2>/dev/null | grep -v ".pyc" | head -20
-          echo ""
-
-          echo "=== Check bin/targets after make info ==="
-          make info > /dev/null 2>&1 || true
-          find bin/targets -type f 2>/dev/null | head -20
-          echo ""
-
-          echo "=== Check if profiles dir created after make info ==="
-          find bin/targets -name "profiles" -type d 2>/dev/null
-          find bin/targets -name "*.json" 2>/dev/null | head -10
-          echo ""
-
-          echo "=== include/image.mk device generation ==="
-          grep -n "TargetInfo\|targetinfo\|DEVICE_ID\|DEVICE_TITLE\|define Device\|eval.*Device" include/image.mk 2>/dev/null | head -30
-          echo ""
-
+          echo "=== Building ==="
+          PKGS="luci luci-i18n-base-zh-cn luci-theme-argon curl wget htop ca-certificates ca-bundle openssl-util -luci-app-accesscontrol -luci-app-filetransfer ${{ github.event.inputs.packages }}"
+          echo "Packages: $PKGS"
+          make image PROFILE="rumu3f_fine-3399" PACKAGES="$PKGS" FILES="files" V=s > build.log 2>&1
+          MAKE_EXIT=$?
+          echo "=== Make exit code: $MAKE_EXIT ==="
+          echo "=== Build log (last 200 lines) ==="
+          tail -200 build.log
+          echo "=== Generated files ==="
+          find bin/targets -type f 2>&1
           mkdir -p ../output
-          cp .targetinfo ../output/ 2>/dev/null || true
-          echo "done" > ../output/done.txt
+          find bin/targets -type f -name "*.img.gz" -exec cp {} ../output/ \; 2>&1
+          find bin/targets -type f -name "*rootfs*.tar.gz" -exec cp {} ../output/ \; 2>&1
+          find bin/targets -type f -name "*.manifest" -exec cp {} ../output/ \; 2>&1
+          cp build.log ../output/ 2>&1
+          echo "=== Output files ==="
+          ls -lh ../output/ 2>&1
+          if [ $MAKE_EXIT -ne 0 ]; then
+            echo "=== Build failed ==="
+            exit 1
+          fi
 
       - name: Upload
         uses: actions/upload-artifact@v4
         with:
-          name: OpenWrt_debug
+          name: OpenWrt_firmware
           path: output/
-          retention-days: 7
+          retention-days: 30
