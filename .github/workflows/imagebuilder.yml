@@ -4,75 +4,53 @@ on:
   workflow_dispatch:
     inputs:
       packages:
-        description: 'Extra packages (space separated)'
+        description: 'Extra packages'
         required: false
         default: ''
-
-env:
-  REPO: 17688838786/QWRT-fine3399
-  TARGET: rockchip/armv8
-  PROFILE: rumu3f_fine-3399
 
 jobs:
   build:
     runs-on: ubuntu-latest
     steps:
-      - name: Install dependencies
+      - name: Install deps
         run: |
           sudo apt-get update
           sudo apt-get install -y build-essential clang flex bison g++ gawk gettext git libncurses-dev libssl-dev rsync unzip zlib1g-dev file wget xz-utils
 
-      - name: Get latest release
+      - name: Get release
         id: release
         run: |
-          TAG=$(curl -s "https://api.github.com/repos/${{ env.REPO }}/releases/latest" | grep -o '"tag_name": *"[^"]*"' | head -1 | sed 's/.*"tag_name": *"\([^"]*\)".*/\1/')
+          TAG=$(curl -s "https://api.github.com/repos/17688838786/QWRT-fine3399/releases/latest" | grep -o '"tag_name": *"[^"]*"' | head -1 | sed 's/.*"tag_name": *"\([^"]*\)".*/\1/')
           echo "tag=$TAG" >> $GITHUB_OUTPUT
           echo "Release: $TAG"
-          
-          IB_URL=$(curl -s "https://api.github.com/repos/${{ env.REPO }}/releases/tags/$TAG" | grep -o '"browser_download_url": *"[^"]*imagebuilder[^"]*"' | head -1 | sed 's/.*"browser_download_url": *"\([^"]*\)".*/\1/')
+          IB_URL=$(curl -s "https://api.github.com/repos/17688838786/QWRT-fine3399/releases/tags/$TAG" | grep -o '"browser_download_url": *"[^"]*imagebuilder[^"]*"' | head -1 | sed 's/.*"browser_download_url": *"\([^"]*\)".*/\1/')
           echo "ib_url=$IB_URL" >> $GITHUB_OUTPUT
-          echo "ImageBuilder: $IB_URL"
+          echo "IB: $IB_URL"
 
-      - name: Download ImageBuilder
+      - name: Download IB
         run: |
-          wget -q -O imagebuilder.tar.xz "${{ steps.release.outputs.ib_url }}"
-          ls -lh imagebuilder.tar.xz
+          wget -q -O ib.tar.xz "${{ steps.release.outputs.ib_url }}"
+          ls -lh ib.tar.xz
 
-      - name: Extract ImageBuilder
+      - name: Extract IB
         run: |
-          tar -xf imagebuilder.tar.xz
-          IB_DIR=$(ls -d openwrt-imagebuilder-* | head -1)
-          echo "IB_DIR=$IB_DIR" >> $GITHUB_ENV
-          echo "IB_DIR: $IB_DIR"
+          tar -xf ib.tar.xz
+          echo "IB_DIR=$(ls -d openwrt-imagebuilder-* | head -1)" >> $GITHUB_ENV
 
-      - name: Build firmware
+      - name: Build
         run: |
           cd "${{ env.IB_DIR }}"
-          
-          BASE_PACKAGES="luci luci-i18n-base-zh-cn luci-theme-argon \
-            kmod-ath11k-ahb kmod-ath11k-pci ath11k-firmware-qcn6855 \
-            kmod-usb-net-qmi-wwan kmod-usb-serial-option kmod-usb-serial-qualcomm \
-            kmod-fs-ext4 kmod-fs-vfat block-mount e2fsprogs dosfstools \
-            curl wget nano htop ca-certificates ca-bundle openssl-util zoneinfo-asia"
-          
-          EXTRA_PACKAGES="${{ github.event.inputs.packages }}"
-          ALL_PACKAGES="$BASE_PACKAGES $EXTRA_PACKAGES"
-          
-          echo "Packages: $ALL_PACKAGES"
-          make image PROFILE="${{ env.PROFILE }}" PACKAGES="$ALL_PACKAGES" 2>&1 | tail -30
-          
-          echo ""
-          echo "Generated files:"
+          PKGS="luci luci-i18n-base-zh-cn luci-theme-argon kmod-ath11k-ahb kmod-ath11k-pci ath11k-firmware-qcn6855 kmod-usb-net-qmi-wwan kmod-usb-serial-option kmod-fs-ext4 kmod-fs-vfat block-mount e2fsprogs dosfstools curl wget nano htop ca-certificates ca-bundle openssl-util zoneinfo-asia ${{ github.event.inputs.packages }}"
+          make image PROFILE="rumu3f_fine-3399" PACKAGES="$PKGS" 2>&1 | tail -20
           find bin/targets -type f \( -name "*.img.gz" -o -name "*rootfs*.tar.gz" -o -name "*.manifest" \)
 
-      - name: Copy artifacts
+      - name: Copy
         run: |
           mkdir -p output
-          find "${{ env.IB_DIR }}/bin/targets" -type f \( -name "*.img.gz" -o -name "*rootfs*.tar.gz" -o -name "*.manifest" \) -exec cp -v {} output/ \;
-          echo "Output files:"
+          find "${{ env.IB_DIR }}/bin/targets" -type f \( -name "*.img.gz" -o -name "*rootfs*.tar.gz" -o -name "*.manifest" \) -exec cp {} output/ \;
           ls -lh output/
 
-      - name: Upload firmware
+      - name: Upload
         uses: actions/upload-artifact@v3
         with:
           name: OpenWrt_firmware
