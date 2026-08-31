@@ -130,3 +130,14 @@ PWM_EOF
     echo "PWM fan kernel config added"
 fi
 # === PWM 风扇驱动配置结束 ===
+
+# === GPIO138 控制 + WiFi 默认配置 ===
+if [ -f files/etc/init.d/gpio138 ]; then
+    chmod +x files/etc/init.d/gpio138
+    chmod +x files/usr/bin/gpio138-ctl 2>/dev/null || true
+    chmod +x files/etc/uci-defaults/99-wifi-default 2>/dev/null || true
+    mkdir -p files/etc/rc.d
+    ln -sf ../init.d/gpio138 files/etc/rc.d/S99gpio138
+    echo "GPIO138 control + WiFi default config enabled"
+fi
+# === GPIO138 配置结束 ===
