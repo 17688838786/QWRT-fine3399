@@ -32,18 +32,9 @@ jobs:
           IB_DIR=$(ls -d openwrt-imagebuilder-* | head -1)
           cd "$IB_DIR"
 
-          echo "=== Setup uboot files ==="
-          mkdir -p files/uboot-custom
-          STAGING_IMG="staging_dir/target-aarch64_generic_musl/image"
-          if [ -f "$STAGING_IMG/fine3399-rk3399-idbloader.img" ]; then
-            cp "$STAGING_IMG/fine3399-rk3399-idbloader.img" files/uboot-custom/idbloader.img
-          fi
-          if [ -f "$STAGING_IMG/fine3399-rk3399-u-boot.itb" ]; then
-            cp "$STAGING_IMG/fine3399-rk3399-u-boot.itb" files/uboot-custom/u-boot.itb
-          fi
-          if [ -f "$STAGING_IMG/rk3399_bl31.elf" ]; then
-            cp "$STAGING_IMG/rk3399_bl31.elf" files/uboot-custom/bl31.elf
-          fi
+          echo "=== rockchip image Makefile ==="
+          cat target/linux/rockchip/image/Makefile
+          echo ""
 
           echo "=== Inject device definition ==="
           DEVFILE=/tmp/device-def.mk
@@ -58,32 +49,56 @@ jobs:
           printf '  DEVICE_PACKAGES := brcmfmac-firmware-43430b0-sdio brcmfmac-nvram-43430b0-sdio kmod-brcmfmac kmod-gpio-button-hotplug kmod-usb-net-rtl8152 wpad iwinfo\n' >> "$DEVFILE"
           printf 'endef\n' >> "$DEVFILE"
           printf 'TARGET_DEVICES += rumu3f_fine-3399\n' >> "$DEVFILE"
+          echo "Device definition:"
+          cat "$DEVFILE"
+          echo ""
           cat "$DEVFILE" >> target/linux/rockchip/image/armv8.mk
           echo "Appended to armv8.mk"
+          echo ""
 
-          echo "=== Building (without FILES param) ==="
+          echo "=== Setup custom uboot files ==="
+          mkdir -p files/uboot-custom
+          STAGING_IMG="staging_dir/target-aarch64_generic_musl/image"
+          echo "Available uboot files in staging:"
+          ls -la "$STAGING_IMG/" 2>/dev/null
+          if [ -f "$STAGING_IMG/fine3399-rk3399-idbloader.img" ]; then
+            cp "$STAGING_IMG/fine3399-rk3399-idbloader.img" files/uboot-custom/idbloader.img
+            echo "Copied idbloader.img"
+          fi
+          if [ -f "$STAGING_IMG/fine3399-rk3399-u-boot.itb" ]; then
+            cp "$STAGING_IMG/fine3399-rk3399-u-boot.itb" files/uboot-custom/u-boot.itb
+            echo "Copied u-boot.itb"
+          fi
+          if [ -f "$STAGING_IMG/rk3399_bl31.elf" ]; then
+            cp "$STAGING_IMG/rk3399_bl31.elf" files/uboot-custom/bl31.elf
+            echo "Copied bl31.elf"
+          fi
+          echo "Custom uboot files:"
+          ls -la files/uboot-custom/
+          echo ""
+
+          echo "=== Verify device in make info ==="
+          make info 2>&1 | grep -A 10 "rumu3f_fine-3399"
+          echo ""
+
+          echo "=== Building ==="
           PKGS="luci luci-i18n-base-zh-cn luci-theme-argon curl wget htop ca-certificates ca-bundle openssl-util -luci-app-accesscontrol -luci-app-filetransfer ${{ github.event.inputs.packages }}"
           echo "Packages: $PKGS"
           make image PROFILE="rumu3f_fine-3399" PACKAGES="$PKGS" V=s > build.log 2>&1
           MAKE_EXIT=$?
           echo "=== Make exit code: $MAKE_EXIT ==="
-          tail -100 build.log
+          echo "=== Build log (last 200 lines) ==="
+          tail -200 build.log
 
-          echo "=== Generated files ==="
-          find bin/targets -type f 2>&1
-
-          # 找到生成的 rootfs.tar.gz
+          echo "=== Inject custom files into rootfs ==="
+          CUSTOM_DIR="$GITHUB_WORKSPACE/files"
           ROOTFS=$(find bin/targets -name "*rootfs*.tar.gz" | head -1)
           echo "RootFS: $ROOTFS"
-
-          if [ -n "$ROOTFS" ] && [ $MAKE_EXIT -eq 0 ]; then
-            echo "=== Inject custom files into rootfs ==="
-            CUSTOM_DIR="$GITHUB_WORKSPACE/files"
-            mkdir -p /tmp/rootfs_extract
-            cd /tmp/rootfs_extract
+          if [ -n "$ROOTFS" ]; then
+            mkdir -p /tmp/rootfs_inject
+            cd /tmp/rootfs_inject
             tar -xzf "$OLDPWD/$ROOTFS"
             echo "Extracted rootfs"
-
             # 复制自定义文件
             if [ -f "$CUSTOM_DIR/etc/init.d/gpio138" ]; then
               mkdir -p etc/init.d
@@ -112,10 +127,8 @@ jobs:
             mkdir -p etc/rc.d
             ln -sf ../init.d/gpio138 etc/rc.d/S99gpio138
             echo "Created S99gpio138 symlink"
-
             echo "Custom files in rootfs:"
             find etc/init.d etc/config usr/bin etc/uci-defaults etc/rc.d -type f -o -type l 2>/dev/null
-
             # 重新打包
             echo "Repacking rootfs..."
             tar -czf /tmp/new_rootfs.tar.gz .
@@ -124,6 +137,8 @@ jobs:
             cd "$OLDPWD"
           fi
 
+          echo "=== Generated files ==="
+          find bin/targets -type f 2>&1
           mkdir -p ../output
           find bin/targets -type f -name "*.img.gz" -exec cp {} ../output/ \; 2>&1
           find bin/targets -type f -name "*rootfs*.tar.gz" -exec cp {} ../output/ \; 2>&1
