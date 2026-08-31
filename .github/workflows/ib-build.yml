@@ -63,47 +63,44 @@ jobs:
 
           echo "=== Copy custom files (GPIO138 + WiFi default) ==="
           CUSTOM_DIR="$GITHUB_WORKSPACE/files"
-          CUSTOM_ROOT="$PWD/custom_files"
-          mkdir -p "$CUSTOM_ROOT/etc/init.d"
-          mkdir -p "$CUSTOM_ROOT/etc/config"
-          mkdir -p "$CUSTOM_ROOT/usr/bin"
-          mkdir -p "$CUSTOM_ROOT/etc/uci-defaults"
-          mkdir -p "$CUSTOM_ROOT/etc/rc.d"
+          # 自定义文件直接放到 files/ 目录（ImageBuilder 默认包含）
+          mkdir -p files/etc/init.d
+          mkdir -p files/etc/config
+          mkdir -p files/usr/bin
+          mkdir -p files/etc/uci-defaults
+          mkdir -p files/etc/rc.d
           # 复制 GPIO138 控制脚本
           if [ -f "$CUSTOM_DIR/etc/init.d/gpio138" ]; then
-            cp "$CUSTOM_DIR/etc/init.d/gpio138" "$CUSTOM_ROOT/etc/init.d/gpio138"
-            chmod +x "$CUSTOM_ROOT/etc/init.d/gpio138"
+            cp "$CUSTOM_DIR/etc/init.d/gpio138" files/etc/init.d/gpio138
+            chmod +x files/etc/init.d/gpio138
             echo "Copied gpio138 init.d"
           fi
           if [ -f "$CUSTOM_DIR/etc/config/gpio138" ]; then
-            cp "$CUSTOM_DIR/etc/config/gpio138" "$CUSTOM_ROOT/etc/config/gpio138"
+            cp "$CUSTOM_DIR/etc/config/gpio138" files/etc/config/gpio138
             echo "Copied gpio138 config"
           fi
           if [ -f "$CUSTOM_DIR/usr/bin/gpio138-ctl" ]; then
-            cp "$CUSTOM_DIR/usr/bin/gpio138-ctl" "$CUSTOM_ROOT/usr/bin/gpio138-ctl"
-            chmod +x "$CUSTOM_ROOT/usr/bin/gpio138-ctl"
+            cp "$CUSTOM_DIR/usr/bin/gpio138-ctl" files/usr/bin/gpio138-ctl
+            chmod +x files/usr/bin/gpio138-ctl
             echo "Copied gpio138-ctl"
           fi
           # 复制 WiFi 默认配置
           if [ -f "$CUSTOM_DIR/etc/uci-defaults/99-wifi-default" ]; then
-            cp "$CUSTOM_DIR/etc/uci-defaults/99-wifi-default" "$CUSTOM_ROOT/etc/uci-defaults/99-wifi-default"
-            chmod +x "$CUSTOM_ROOT/etc/uci-defaults/99-wifi-default"
+            cp "$CUSTOM_DIR/etc/uci-defaults/99-wifi-default" files/etc/uci-defaults/99-wifi-default
+            chmod +x files/etc/uci-defaults/99-wifi-default
             echo "Copied 99-wifi-default"
           fi
           # 创建开机自启符号链接
-          ln -sf ../init.d/gpio138 "$CUSTOM_ROOT/etc/rc.d/S99gpio138"
+          ln -sf ../init.d/gpio138 files/etc/rc.d/S99gpio138
           echo "Created S99gpio138 symlink"
-          echo "Custom files:"
-          find "$CUSTOM_ROOT" -type f 2>/dev/null
+          echo "Custom files in files/:"
+          find files/etc files/usr -type f 2>/dev/null
           echo ""
 
           echo "=== Building ==="
           PKGS="luci luci-i18n-base-zh-cn luci-theme-argon curl wget htop ca-certificates ca-bundle openssl-util -luci-app-accesscontrol -luci-app-filetransfer ${{ github.event.inputs.packages }}"
           echo "Packages: $PKGS"
-          echo "Custom files dir: $CUSTOM_ROOT"
-          ls -laR "$CUSTOM_ROOT" 2>&1
-          echo ""
-          make image PROFILE="rumu3f_fine-3399" PACKAGES="$PKGS" FILES="custom_files" V=s > build.log 2>&1
+          make image PROFILE="rumu3f_fine-3399" PACKAGES="$PKGS" V=s > build.log 2>&1
           MAKE_EXIT=$?
           echo "=== Make exit code: $MAKE_EXIT ==="
           echo "=== Build log (last 200 lines) ==="
