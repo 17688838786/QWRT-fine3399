@@ -2,11 +2,6 @@ name: ImageBuilder Build
 
 on:
   workflow_dispatch:
-    inputs:
-      packages:
-        description: 'Extra packages'
-        required: false
-        default: ''
 
 jobs:
   build:
