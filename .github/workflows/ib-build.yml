@@ -27,65 +27,56 @@ jobs:
           IB_URL=$(curl -s "https://api.github.com/repos/17688838786/QWRT-fine3399/releases/tags/$TAG" | grep -o '"browser_download_url": *"[^"]*imagebuilder[^"]*"' | head -1 | sed 's/.*"browser_download_url": *"\([^"]*\)".*/\1/')
           echo "IB: $IB_URL"
           wget -q -O ib.tar.xz "$IB_URL"
-          ls -lh ib.tar.xz
           tar -xf ib.tar.xz
           IB_DIR=$(ls -d openwrt-imagebuilder-* | head -1)
-          echo "IB_DIR: $IB_DIR"
           cd "$IB_DIR"
 
-          echo "=== Inject JSON profile ==="
-          mkdir -p target/linux/rockchip/armv8/profiles
-          mkdir -p bin/targets/rockchip/armv8/profiles
-          cat > target/linux/rockchip/armv8/profiles/rumu3f_fine-3399.json << 'JSONEOF'
-          {
-            "id": "rumu3f_fine-3399",
-            "target": "rockchip/armv8",
-            "images": [
-              {
-                "name": "openwrt-rockchip-armv8-rumu3f_fine-3399-squashfs-sysupgrade.img.gz",
-                "type": "sysupgrade",
-                "filesystem": "squashfs"
-              }
-            ],
-            "device_packages": [
-              "brcmfmac-firmware-43430b0-sdio",
-              "brcmfmac-nvram-43430b0-sdio",
-              "kmod-brcmfmac",
-              "kmod-gpio-button-hotplug",
-              "kmod-usb-net-rtl8152",
-              "wpad",
-              "iwinfo"
-            ],
-            "supported_devices": ["rumu3f,fine-3399"],
-            "title": "RUMU3F FINE 3399"
-          }
-          JSONEOF
-          cp target/linux/rockchip/armv8/profiles/rumu3f_fine-3399.json bin/targets/rockchip/armv8/profiles/
-          echo "JSON files created:"
-          find . -name "*.json" 2>/dev/null
+          echo "=== scripts directory ==="
+          ls -la scripts/
           echo ""
-
-          echo "=== Building ==="
-          PKGS="luci luci-i18n-base-zh-cn luci-theme-argon curl wget htop ca-certificates ca-bundle openssl-util -luci-app-accesscontrol -luci-app-filetransfer ${{ github.event.inputs.packages }}"
-          echo "Packages: $PKGS"
-          make image PROFILE="rumu3f_fine-3399" PACKAGES="$PKGS" > build.log 2>&1
+          echo "=== json-related scripts ==="
+          find scripts/ -name "*json*" -o -name "*image*" 2>/dev/null
+          echo ""
+          echo "=== json_add_image_info.py content (if exists) ==="
+          cat scripts/json_add_image_info.py 2>/dev/null || echo "NOT FOUND"
+          echo ""
+          echo "=== grep JSON in include/image.mk ==="
+          grep -n -i "json" include/image.mk 2>/dev/null | head -30
+          echo ""
+          echo "=== grep JSON in target/linux/rockchip/image/Makefile ==="
+          cat target/linux/rockchip/image/Makefile
+          echo ""
+          echo "=== target/linux/rockchip/image/armv8.mk ==="
+          cat target/linux/rockchip/image/armv8.mk
+          echo ""
+          echo "=== .config TARGET_ROOTFS_* ==="
+          grep -E "TARGET_ROOTFS|CONFIG_TARGET_ROOTFS" .config | head -20
+          echo ""
+          echo "=== .config JSON related ==="
+          grep -i "json" .config 2>/dev/null | head -10
+          echo ""
+          echo "=== make info for fine3399 ==="
+          make info 2>&1 | grep -A 20 "rumu3f_fine-3399"
+          echo ""
+          echo "=== Build with V=s for verbose output ==="
+          PKGS="luci luci-i18n-base-zh-cn luci-theme-argon -luci-app-accesscontrol -luci-app-filetransfer ${{ github.event.inputs.packages }}"
+          make image PROFILE="rumu3f_fine-3399" PACKAGES="$PKGS" V=s > build_verbose.log 2>&1
           MAKE_EXIT=$?
-          echo "=== Make exit code: $MAKE_EXIT ==="
-          echo "=== Build log (last 150 lines) ==="
-          tail -150 build.log
+          echo "Make exit: $MAKE_EXIT"
+          echo "=== Build log - image building section ==="
+          grep -n -i "building image\|json\|img\.gz\|rootfs\|mkfs\|dd if\|Image/Build" build_verbose.log | head -50
+          echo ""
+          echo "=== Build log last 80 lines ==="
+          tail -80 build_verbose.log
+          echo ""
           echo "=== Generated files ==="
           find bin/targets -type f 2>&1
           mkdir -p ../output
           find bin/targets -type f -name "*.img.gz" -exec cp {} ../output/ \; 2>&1
           find bin/targets -type f -name "*rootfs*.tar.gz" -exec cp {} ../output/ \; 2>&1
-          find bin/targets -type f -name "*.manifest" -exec cp {} ../output/ \; 2>&1
-          cp build.log ../output/ 2>&1
-          echo "=== Output files ==="
-          ls -lh ../output/ 2>&1
-          if [ $MAKE_EXIT -ne 0 ]; then
-            echo "=== Build failed ==="
-            exit 1
-          fi
+          cp build_verbose.log ../output/ 2>&1
+          echo "=== Output ==="
+          ls -lh ../output/
 
       - name: Upload
         uses: actions/upload-artifact@v4
