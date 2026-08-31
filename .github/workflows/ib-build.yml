@@ -12,5 +12,52 @@ jobs:
   build:
     runs-on: ubuntu-22.04
     steps:
-      - name: Test
-        run: echo 'Hello from ImageBuilder'
+      - name: Checkout
+        uses: actions/checkout@main
+
+      - name: Install deps
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y build-essential clang flex bison g++ gawk gettext git libncurses-dev libssl-dev rsync unzip zlib1g-dev file wget xz-utils
+
+      - name: Get release
+        id: release
+        run: |
+          TAG=$(curl -s "https://api.github.com/repos/17688838786/QWRT-fine3399/releases/latest" | grep -o '"tag_name": *"[^"]*"' | head -1 | sed 's/.*"tag_name": *"\([^"]*\)".*/\1/')
+          echo "tag=$TAG" >> $GITHUB_OUTPUT
+          echo "Release: $TAG"
+          IB_URL=$(curl -s "https://api.github.com/repos/17688838786/QWRT-fine3399/releases/tags/$TAG" | grep -o '"browser_download_url": *"[^"]*imagebuilder[^"]*"' | head -1 | sed 's/.*"browser_download_url": *"\([^"]*\)".*/\1/')
+          echo "ib_url=$IB_URL" >> $GITHUB_OUTPUT
+          echo "IB: $IB_URL"
+
+      - name: Download IB
+        run: |
+          wget -q -O ib.tar.xz "${{ steps.release.outputs.ib_url }}"
+          ls -lh ib.tar.xz
+
+      - name: Extract IB
+        run: |
+          tar -xf ib.tar.xz
+          echo "IB_DIR=$(ls -d openwrt-imagebuilder-* | head -1)" >> $GITHUB_ENV
+
+      - name: Build
+        run: |
+          cd "${{ env.IB_DIR }}"
+          PKGS="luci luci-i18n-base-zh-cn luci-theme-argon kmod-ath11k-ahb kmod-ath11k-pci ath11k-firmware-qcn6855 kmod-usb-net-qmi-wwan kmod-usb-serial-option kmod-fs-ext4 kmod-fs-vfat block-mount e2fsprogs dosfstools curl wget nano htop ca-certificates ca-bundle openssl-util zoneinfo-asia ${{ github.event.inputs.packages }}"
+          make image PROFILE="rumu3f_fine-3399" PACKAGES="$PKGS" 2>&1 | tail -20
+          find bin/targets -type f -name "*.img.gz" -o -name "*rootfs*.tar.gz" -o -name "*.manifest"
+
+      - name: Copy
+        run: |
+          mkdir -p output
+          find "${{ env.IB_DIR }}/bin/targets" -type f -name "*.img.gz" -exec cp {} output/ \;
+          find "${{ env.IB_DIR }}/bin/targets" -type f -name "*rootfs*.tar.gz" -exec cp {} output/ \;
+          find "${{ env.IB_DIR }}/bin/targets" -type f -name "*.manifest" -exec cp {} output/ \;
+          ls -lh output/
+
+      - name: Upload
+        uses: actions/upload-artifact@v3
+        with:
+          name: OpenWrt_firmware
+          path: output/
+          retention-days: 30
